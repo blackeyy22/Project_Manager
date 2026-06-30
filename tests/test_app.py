@@ -21,7 +21,7 @@ def test_dashboard_creates_database(tmp_path):
     response = app.test_client().get("/")
 
     assert response.status_code == 200
-    assert b"Greenboard" in response.data
+    assert b"Operations Workspace" in response.data
     assert b"Add Item" in response.data
     assert b"Work Board" in response.data
     assert b"Task Status" in response.data
