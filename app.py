@@ -26,7 +26,7 @@ DEFAULT_DB_PATH = BASE_DIR / "data" / "project_manager.sqlite3"
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M"
 
 PROJECT_STATUSES = ("Planned", "Active", "Paused", "Done")
-TASK_STATUSES = ("Todo", "Doing", "Blocked", "Done")
+TASK_STATUSES = ("Todo", "Doing", "Review", "Blocked", "Done")
 TASK_PRIORITIES = ("Low", "Normal", "High", "Critical")
 MEETING_STATUSES = ("Planned", "Held", "Cancelled")
 
@@ -360,6 +360,29 @@ def register_routes(app: Flask) -> None:
         flash("Task updated.", "success")
         return redirect(url_for("dashboard"))
 
+    @app.post("/tasks/<int:task_id>/status")
+    def update_task_status(task_id: int):
+        payload = request.get_json(silent=True) or {}
+        status = payload.get("status") or request.form.get("status", "")
+        if status not in TASK_STATUSES:
+            if wants_json():
+                return jsonify({"ok": False, "error": "Invalid status."}), 400
+            flash("Invalid task status.", "error")
+            return redirect(url_for("dashboard"))
+
+        db = get_db()
+        db.execute(
+            "UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?",
+            (status, current_timestamp(), task_id),
+        )
+        db.commit()
+
+        if wants_json():
+            return jsonify({"ok": True, "status": status})
+
+        flash("Task moved.", "success")
+        return redirect(url_for("dashboard"))
+
     @app.post("/tasks/<int:task_id>/delete")
     def delete_task(task_id: int):
         db = get_db()
@@ -555,26 +578,30 @@ def load_task_chart(db: sqlite3.Connection) -> dict:
             counts[row["status"]] = row["count"]
 
     total = sum(counts.values())
-    done = counts["Done"]
-    doing = counts["Doing"]
-    blocked = counts["Blocked"]
-    todo = counts["Todo"]
-    done_degrees = round((done / total) * 360) if total else 0
-    doing_degrees = done_degrees + (round((doing / total) * 360) if total else 0)
-    blocked_degrees = doing_degrees + (round((blocked / total) * 360) if total else 0)
+    cursor = 0
+    segments = []
+    for status in TASK_STATUSES:
+        count = counts[status]
+        degrees = round((count / total) * 360) if total else 0
+        next_cursor = cursor + degrees
+        key = status.lower()
+        if count:
+            segments.append(f"var(--status-{key}) {cursor}deg {next_cursor}deg")
+        cursor = next_cursor
+
+    gradient = ", ".join(segments) if segments else "var(--status-empty) 0deg 360deg"
 
     return {
         "counts": counts,
         "total": total,
-        "todo": todo,
-        "doing": doing,
-        "blocked": blocked,
-        "done": done,
-        "done_percent": round((done / total) * 100) if total else 0,
-        "doing_percent": round((doing / total) * 100) if total else 0,
-        "done_degrees": done_degrees,
-        "doing_degrees": doing_degrees,
-        "blocked_degrees": blocked_degrees,
+        "todo": counts["Todo"],
+        "doing": counts["Doing"],
+        "review": counts["Review"],
+        "blocked": counts["Blocked"],
+        "done": counts["Done"],
+        "done_percent": round((counts["Done"] / total) * 100) if total else 0,
+        "doing_percent": round((counts["Doing"] / total) * 100) if total else 0,
+        "gradient": gradient,
     }
 
 
@@ -817,4 +844,4 @@ def optional_datetime(field: str) -> str | None:
 
 
 if __name__ == "__main__":
-    create_app().run(debug=True)
+    create_app().run(debug=True, use_reloader=False)

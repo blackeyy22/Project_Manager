@@ -45,190 +45,240 @@
     {% endif %}
   {% endwith %}
 
-  <main>
-    <section class="metrics-strip" aria-label="Project metrics">
-      <div class="metric">
-        <span>{{ stats.active_projects }}</span>
-        <p>Active Projects</p>
+  <main class="app-shell">
+    <aside class="project-sidebar">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Portfolio</p>
+          <h2>Projects</h2>
+        </div>
+        <i data-lucide="folders"></i>
       </div>
-      <div class="metric">
-        <span>{{ stats.open_tasks }}</span>
-        <p>Open Tasks</p>
+
+      <div class="portfolio-metrics">
+        <div>
+          <span>{{ stats.active_projects }}</span>
+          <small>Active</small>
+        </div>
+        <div>
+          <span>{{ stats.avg_completion }}%</span>
+          <small>Average</small>
+        </div>
       </div>
-      <div class="metric">
-        <span>{{ task_chart.doing }}</span>
-        <p>Doing Now</p>
+
+      <div class="project-list">
+        {% for project in project_summaries %}
+          <button class="project-row" type="button" data-project-id="{{ project.id }}">
+            <span class="project-row-main">
+              <strong>{{ project.name }}</strong>
+              <small>{{ project.status }} - {{ project.open_tasks }} open</small>
+            </span>
+            <span class="mini-progress" style="--progress: {{ project.completion }}%"></span>
+          </button>
+        {% else %}
+          <p class="empty-state">Create a project from Add.</p>
+        {% endfor %}
       </div>
-      <div class="metric">
-        <span>{{ stats.avg_completion }}%</span>
-        <p>Completion</p>
+    </aside>
+
+    <section class="board-workspace">
+      <div class="board-toolbar">
+        <div>
+          <p class="eyebrow">Kanban</p>
+          <h2>Work Board</h2>
+        </div>
+        <div class="filters">
+          <label class="filter-control">
+            <i data-lucide="search"></i>
+            <input data-filter-search type="search" placeholder="Search cards">
+          </label>
+          <label class="filter-control">
+            <select data-filter-project>
+              <option value="">All projects</option>
+              {% for project in projects %}
+                <option value="{{ project.id }}">{{ project.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="filter-control">
+            <select data-filter-priority>
+              <option value="">All priorities</option>
+              {% for priority in task_priorities %}
+                <option value="{{ priority }}">{{ priority }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="kanban-board">
+        {% for status in task_statuses %}
+          {% set column = namespace(total=0) %}
+          {% for task in tasks %}
+            {% if task.status == status %}
+              {% set column.total = column.total + 1 %}
+            {% endif %}
+          {% endfor %}
+          <section class="kanban-column" data-drop-status="{{ status }}">
+            <div class="column-heading">
+              <div>
+                <span class="status-dot {{ status|lower }}"></span>
+                <h3>{{ status }}</h3>
+              </div>
+              <span class="column-count" data-count-for="{{ status }}">{{ column.total }}</span>
+            </div>
+
+            <div class="task-stack">
+              {% for task in tasks %}
+                {% if task.status == status %}
+                  <article
+                    class="kanban-card priority-{{ task.priority|lower }}"
+                    draggable="true"
+                    data-task-card
+                    data-task-id="{{ task.id }}"
+                    data-status="{{ task.status }}"
+                    data-project-id="{{ task.project_id or '' }}"
+                    data-priority="{{ task.priority }}"
+                    data-search="{{ task.title }} {{ task.project_name or '' }} {{ task.assignee or '' }} {{ task.notes or '' }}"
+                  >
+                    <div class="card-kicker">
+                      <span>PM-{{ task.id }}</span>
+                      <span class="priority {{ task.priority|lower }}">{{ task.priority }}</span>
+                    </div>
+                    <h4>{{ task.title }}</h4>
+                    <p>{{ task.project_name or 'Unassigned' }}</p>
+                    <div class="card-meta">
+                      {% if task.due_at %}
+                        <span><i data-lucide="calendar-clock"></i>{{ task.due_at }}</span>
+                      {% endif %}
+                      {% if task.assignee %}
+                        <span><i data-lucide="user-round"></i>{{ task.assignee }}</span>
+                      {% endif %}
+                      {% if task.project_git_url %}
+                        <a href="{{ task.project_git_url }}" target="_blank" rel="noreferrer">
+                          <i data-lucide="git-branch"></i>Git
+                        </a>
+                      {% endif %}
+                    </div>
+                    {% if task.notes %}
+                      <p class="card-notes">{{ task.notes }}</p>
+                    {% endif %}
+                    <details>
+                      <summary><i data-lucide="square-pen"></i>Edit</summary>
+                      <form class="compact-form" method="post" action="{{ url_for('update_task', task_id=task.id) }}">
+                        <label class="full">
+                          <span>Title</span>
+                          <input name="title" type="text" value="{{ task.title }}" required>
+                        </label>
+                        <label>
+                          <span>Project</span>
+                          <select name="project_id">
+                            <option value="">Unassigned</option>
+                            {% for project in projects %}
+                              <option value="{{ project.id }}" {{ 'selected' if task.project_id == project.id else '' }}>{{ project.name }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Status</span>
+                          <select name="status">
+                            {% for task_status in task_statuses %}
+                              <option value="{{ task_status }}" {{ 'selected' if task.status == task_status else '' }}>{{ task_status }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Priority</span>
+                          <select name="priority">
+                            {% for priority in task_priorities %}
+                              <option value="{{ priority }}" {{ 'selected' if task.priority == priority else '' }}>{{ priority }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Due</span>
+                          <input name="due_at" type="datetime-local" value="{{ task.due_at or '' }}">
+                        </label>
+                        <label class="full">
+                          <span>Assignee</span>
+                          <input name="assignee" type="text" value="{{ task.assignee or '' }}">
+                        </label>
+                        <label class="full">
+                          <span>Notes</span>
+                          <textarea name="notes" rows="2">{{ task.notes or '' }}</textarea>
+                        </label>
+                        <button class="secondary" type="submit">
+                          <i data-lucide="save"></i>
+                          Save
+                        </button>
+                      </form>
+                      <form method="post" action="{{ url_for('delete_task', task_id=task.id) }}">
+                        <button class="danger full-width" type="submit">
+                          <i data-lucide="trash-2"></i>
+                          Delete
+                        </button>
+                      </form>
+                    </details>
+                  </article>
+                {% endif %}
+              {% endfor %}
+              <p class="empty-column" data-empty-column>Drop cards here.</p>
+            </div>
+          </section>
+        {% endfor %}
       </div>
     </section>
 
-    <section class="dashboard-grid">
-      <aside class="project-rail">
-        <div class="section-heading">
+    <aside class="insight-sidebar">
+      <section class="insight-card">
+        <div class="panel-heading">
           <div>
-            <p class="eyebrow">Projects</p>
-            <h2>Existing Projects</h2>
-          </div>
-          <i data-lucide="folder-kanban"></i>
-        </div>
-
-        <div class="project-list">
-          {% for project in project_summaries %}
-            <button class="project-row" type="button" data-project-id="{{ project.id }}">
-              <span class="project-row-main">
-                <strong>{{ project.name }}</strong>
-                <small>{{ project.status }} - {{ project.open_tasks }} open</small>
-              </span>
-              <span class="mini-progress" style="--progress: {{ project.completion }}%"></span>
-            </button>
-          {% else %}
-            <p class="empty-state">Add your first project from the Add button.</p>
-          {% endfor %}
-        </div>
-
-        <article class="project-detail" data-project-detail>
-          <div class="empty-state">Select a project to see completion.</div>
-        </article>
-      </aside>
-
-      <section class="task-overview">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Tasks</p>
+            <p class="eyebrow">Flow</p>
             <h2>Task Status</h2>
           </div>
           <i data-lucide="pie-chart"></i>
         </div>
         <div class="task-pie-wrap">
-          <div
-            class="task-pie"
-            style="--done: {{ task_chart.done_degrees }}deg; --doing: {{ task_chart.doing_degrees }}deg; --blocked: {{ task_chart.blocked_degrees }}deg"
-          >
+          <div class="task-pie" style="background: conic-gradient({{ task_chart.gradient }})">
             <span>{{ task_chart.doing_percent }}%</span>
             <small>Doing</small>
           </div>
           <div class="task-legend">
-            <span><i class="legend-dot todo"></i>Todo {{ task_chart.todo }}</span>
-            <span><i class="legend-dot doing"></i>Doing {{ task_chart.doing }}</span>
-            <span><i class="legend-dot blocked"></i>Blocked {{ task_chart.blocked }}</span>
-            <span><i class="legend-dot done"></i>Done {{ task_chart.done }}</span>
+            {% for status in task_statuses %}
+              <span><i class="legend-dot {{ status|lower }}"></i>{{ status }} {{ task_chart.counts[status] }}</span>
+            {% endfor %}
           </div>
         </div>
       </section>
 
-      <section class="board-panel">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Board</p>
-            <h2>Task Flow</h2>
-          </div>
-          <i data-lucide="kanban-square"></i>
-        </div>
+      <section class="insight-card project-detail" data-project-detail>
+        <div class="empty-state">Select a project for health and completion.</div>
+      </section>
 
-        <div class="board">
-          {% for status in task_statuses %}
-            <section class="board-column">
-              <div class="column-heading">
-                <h3>{{ status }}</h3>
-              </div>
-              <div class="task-stack">
-                {% set column = namespace(count=0) %}
-                {% for task in tasks %}
-                  {% if task.status == status %}
-                    {% set column.count = column.count + 1 %}
-                    <article class="task-card">
-                      <div class="card-title-row">
-                        <h4>{{ task.title }}</h4>
-                        <span class="priority {{ task.priority|lower }}">{{ task.priority }}</span>
-                      </div>
-                      <p>{{ task.project_name or 'Unassigned' }}</p>
-                      <div class="card-meta">
-                        {% if task.due_at %}
-                          <span><i data-lucide="clock"></i>{{ task.due_at }}</span>
-                        {% endif %}
-                        {% if task.assignee %}
-                          <span><i data-lucide="user"></i>{{ task.assignee }}</span>
-                        {% endif %}
-                        {% if task.project_git_url %}
-                          <a href="{{ task.project_git_url }}" target="_blank" rel="noreferrer">
-                            <i data-lucide="external-link"></i>Git
-                          </a>
-                        {% endif %}
-                      </div>
-                      <details>
-                        <summary>Edit</summary>
-                        <form class="compact-form" method="post" action="{{ url_for('update_task', task_id=task.id) }}">
-                          <label>
-                            <span>Title</span>
-                            <input name="title" type="text" value="{{ task.title }}" required>
-                          </label>
-                          <label>
-                            <span>Project</span>
-                            <select name="project_id">
-                              <option value="">Unassigned</option>
-                              {% for project in projects %}
-                                <option value="{{ project.id }}" {{ 'selected' if task.project_id == project.id else '' }}>{{ project.name }}</option>
-                              {% endfor %}
-                            </select>
-                          </label>
-                          <label>
-                            <span>Status</span>
-                            <select name="status">
-                              {% for task_status in task_statuses %}
-                                <option value="{{ task_status }}" {{ 'selected' if task.status == task_status else '' }}>{{ task_status }}</option>
-                              {% endfor %}
-                            </select>
-                          </label>
-                          <label>
-                            <span>Priority</span>
-                            <select name="priority">
-                              {% for priority in task_priorities %}
-                                <option value="{{ priority }}" {{ 'selected' if task.priority == priority else '' }}>{{ priority }}</option>
-                              {% endfor %}
-                            </select>
-                          </label>
-                          <label>
-                            <span>Due</span>
-                            <input name="due_at" type="datetime-local" value="{{ task.due_at or '' }}">
-                          </label>
-                          <label>
-                            <span>Assignee</span>
-                            <input name="assignee" type="text" value="{{ task.assignee or '' }}">
-                          </label>
-                          <label class="full">
-                            <span>Notes</span>
-                            <textarea name="notes" rows="2">{{ task.notes or '' }}</textarea>
-                          </label>
-                          <button class="secondary" type="submit">
-                            <i data-lucide="save"></i>
-                            Save
-                          </button>
-                        </form>
-                        <form method="post" action="{{ url_for('delete_task', task_id=task.id) }}">
-                          <button class="danger full-width" type="submit">
-                            <i data-lucide="trash-2"></i>
-                            Delete
-                          </button>
-                        </form>
-                      </details>
-                    </article>
-                  {% endif %}
-                {% endfor %}
-                {% if column.count == 0 %}
-                  <p class="empty-column">No {{ status|lower }} tasks.</p>
-                {% endif %}
-              </div>
-            </section>
+      <section class="insight-card">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Schedule</p>
+            <h2>Upcoming Meetings</h2>
+          </div>
+          <i data-lucide="calendar-days"></i>
+        </div>
+        <div class="meeting-list">
+          {% for meeting in meetings[:5] %}
+            <article class="meeting-pill">
+              <strong>{{ meeting.title }}</strong>
+              <span>{{ meeting.starts_at }}</span>
+              <small>{{ meeting.project_name or 'Unassigned' }}</small>
+            </article>
+          {% else %}
+            <p class="empty-state">No upcoming meetings.</p>
           {% endfor %}
         </div>
       </section>
-    </section>
+    </aside>
 
-    <section class="calendar-full-panel">
-      <div class="section-heading">
+    <section class="calendar-panel">
+      <div class="panel-heading">
         <div>
           <p class="eyebrow">Calendar</p>
           <h2>Meeting Calendar - {{ calendar_month.label }}</h2>
@@ -546,6 +596,77 @@
       `;
     }
 
+    function applyFilters() {
+      const query = document.querySelector("[data-filter-search]")?.value.trim().toLowerCase() || "";
+      const project = document.querySelector("[data-filter-project]")?.value || "";
+      const priority = document.querySelector("[data-filter-priority]")?.value || "";
+
+      document.querySelectorAll("[data-task-card]").forEach((card) => {
+        const matchesText = !query || card.dataset.search.toLowerCase().includes(query);
+        const matchesProject = !project || card.dataset.projectId === project;
+        const matchesPriority = !priority || card.dataset.priority === priority;
+        card.hidden = !(matchesText && matchesProject && matchesPriority);
+      });
+
+      updateColumnCounts();
+    }
+
+    function updateColumnCounts() {
+      document.querySelectorAll("[data-drop-status]").forEach((column) => {
+        const status = column.dataset.dropStatus;
+        const visibleCards = column.querySelectorAll("[data-task-card]:not([hidden])").length;
+        const count = document.querySelector(`[data-count-for="${status}"]`);
+        const empty = column.querySelector("[data-empty-column]");
+        if (count) {
+          count.textContent = visibleCards;
+        }
+        if (empty) {
+          empty.hidden = visibleCards > 0;
+        }
+      });
+    }
+
+    function setupDragAndDrop() {
+      document.querySelectorAll("[data-task-card]").forEach((card) => {
+        card.addEventListener("dragstart", (event) => {
+          card.classList.add("dragging");
+          event.dataTransfer.setData("text/plain", card.dataset.taskId);
+        });
+        card.addEventListener("dragend", () => card.classList.remove("dragging"));
+      });
+
+      document.querySelectorAll("[data-drop-status]").forEach((column) => {
+        column.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          column.classList.add("drag-over");
+        });
+        column.addEventListener("dragleave", () => column.classList.remove("drag-over"));
+        column.addEventListener("drop", async (event) => {
+          event.preventDefault();
+          column.classList.remove("drag-over");
+          const taskId = event.dataTransfer.getData("text/plain");
+          const status = column.dataset.dropStatus;
+          const card = document.querySelector(`[data-task-id="${taskId}"]`);
+          if (!card || card.dataset.status === status) {
+            return;
+          }
+
+          const response = await fetch(`/tasks/${taskId}/status`, {
+            method: "POST",
+            headers: {
+              "Accept": "application/json",
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ status })
+          });
+
+          if (response.ok) {
+            window.location.reload();
+          }
+        });
+      });
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
       const addDialog = document.querySelector("[data-add-dialog]");
       document.querySelector("[data-open-add]")?.addEventListener("click", () => addDialog.showModal());
@@ -578,6 +699,11 @@
         selectProject(projects[0].id);
       }
 
+      document.querySelector("[data-filter-search]")?.addEventListener("input", applyFilters);
+      document.querySelector("[data-filter-project]")?.addEventListener("change", applyFilters);
+      document.querySelector("[data-filter-priority]")?.addEventListener("change", applyFilters);
+      setupDragAndDrop();
+      updateColumnCounts();
       refreshIcons();
     });
   </script>
