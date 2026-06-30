@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Manager</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Project Manager</p>
+      <h1>Greenboard</h1>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill {{ 'ready' if discord_ready else 'muted' }}">
+        <i data-lucide="{{ 'bell-ring' if discord_ready else 'bell-off' }}"></i>
+        {{ 'Discord on' if discord_ready else 'Discord off' }}
+      </span>
+      <form method="post" action="{{ url_for('test_alert') }}">
+        <button class="icon-button ghost" type="submit" aria-label="Send Discord test alert" title="Send Discord test alert">
+          <i data-lucide="send"></i>
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('send_due_alerts') }}">
+        <button class="icon-button ghost" type="submit" aria-label="Send due alerts" title="Send due alerts">
+          <i data-lucide="radio-tower"></i>
+        </button>
+      </form>
+      <button class="primary add-trigger" type="button" data-open-add>
+        <i data-lucide="plus"></i>
+        Add
+      </button>
+    </div>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-stack" aria-live="polite">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <main>
+    <section class="metrics-strip" aria-label="Project metrics">
+      <div class="metric">
+        <span>{{ stats.active_projects }}</span>
+        <p>Active Projects</p>
+      </div>
+      <div class="metric">
+        <span>{{ stats.open_tasks }}</span>
+        <p>Open Tasks</p>
+      </div>
+      <div class="metric">
+        <span>{{ stats.blocked_tasks }}</span>
+        <p>Blocked</p>
+      </div>
+      <div class="metric">
+        <span>{{ stats.avg_completion }}%</span>
+        <p>Completion</p>
+      </div>
+    </section>
+
+    <section class="dashboard-grid">
+      <aside class="project-rail">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Projects</p>
+            <h2>Existing Projects</h2>
+          </div>
+          <i data-lucide="folder-kanban"></i>
+        </div>
+
+        <div class="project-list">
+          {% for project in project_summaries %}
+            <button class="project-row" type="button" data-project-id="{{ project.id }}">
+              <span class="project-row-main">
+                <strong>{{ project.name }}</strong>
+                <small>{{ project.status }} · {{ project.open_tasks }} open</small>
+              </span>
+              <span class="mini-progress" style="--progress: {{ project.completion }}%"></span>
+            </button>
+          {% else %}
+            <p class="empty-state">Add your first project from the Add button.</p>
+          {% endfor %}
+        </div>
+
+        <article class="project-detail" data-project-detail>
+          <div class="empty-state">Select a project to see completion.</div>
+        </article>
+      </aside>
+
+      <section class="board-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Board</p>
+            <h2>Task Flow</h2>
+          </div>
+          <i data-lucide="kanban-square"></i>
+        </div>
+
+        <div class="board">
+          {% for status in task_statuses %}
+            <section class="board-column">
+              <div class="column-heading">
+                <h3>{{ status }}</h3>
+              </div>
+              <div class="task-stack">
+                {% set column = namespace(count=0) %}
+                {% for task in tasks %}
+                  {% if task.status == status %}
+                    {% set column.count = column.count + 1 %}
+                    <article class="task-card">
+                      <div class="card-title-row">
+                        <h4>{{ task.title }}</h4>
+                        <span class="priority {{ task.priority|lower }}">{{ task.priority }}</span>
+                      </div>
+                      <p>{{ task.project_name or 'Unassigned' }}</p>
+                      <div class="card-meta">
+                        {% if task.due_at %}
+                          <span><i data-lucide="clock"></i>{{ task.due_at }}</span>
+                        {% endif %}
+                        {% if task.assignee %}
+                          <span><i data-lucide="user"></i>{{ task.assignee }}</span>
+                        {% endif %}
+                        {% if task.project_git_url %}
+                          <a href="{{ task.project_git_url }}" target="_blank" rel="noreferrer">
+                            <i data-lucide="external-link"></i>Git
+                          </a>
+                        {% endif %}
+                      </div>
+                      <details>
+                        <summary>Edit</summary>
+                        <form class="compact-form" method="post" action="{{ url_for('update_task', task_id=task.id) }}">
+                          <label>
+                            <span>Title</span>
+                            <input name="title" type="text" value="{{ task.title }}" required>
+                          </label>
+                          <label>
+                            <span>Project</span>
+                            <select name="project_id">
+                              <option value="">Unassigned</option>
+                              {% for project in projects %}
+                                <option value="{{ project.id }}" {{ 'selected' if task.project_id == project.id else '' }}>{{ project.name }}</option>
+                              {% endfor %}
+                            </select>
+                          </label>
+                          <label>
+                            <span>Status</span>
+                            <select name="status">
+                              {% for task_status in task_statuses %}
+                                <option value="{{ task_status }}" {{ 'selected' if task.status == task_status else '' }}>{{ task_status }}</option>
+                              {% endfor %}
+                            </select>
+                          </label>
+                          <label>
+                            <span>Priority</span>
+                            <select name="priority">
+                              {% for priority in task_priorities %}
+                                <option value="{{ priority }}" {{ 'selected' if task.priority == priority else '' }}>{{ priority }}</option>
+                              {% endfor %}
+                            </select>
+                          </label>
+                          <label>
+                            <span>Due</span>
+                            <input name="due_at" type="datetime-local" value="{{ task.due_at or '' }}">
+                          </label>
+                          <label>
+                            <span>Assignee</span>
+                            <input name="assignee" type="text" value="{{ task.assignee or '' }}">
+                          </label>
+                          <label class="full">
+                            <span>Notes</span>
+                            <textarea name="notes" rows="2">{{ task.notes or '' }}</textarea>
+                          </label>
+                          <button class="secondary" type="submit">
+                            <i data-lucide="save"></i>
+                            Save
+                          </button>
+                        </form>
+                        <form method="post" action="{{ url_for('delete_task', task_id=task.id) }}">
+                          <button class="danger full-width" type="submit">
+                            <i data-lucide="trash-2"></i>
+                            Delete
+                          </button>
+                        </form>
+                      </details>
+                    </article>
+                  {% endif %}
+                {% endfor %}
+                {% if column.count == 0 %}
+                  <p class="empty-column">No {{ status|lower }} tasks.</p>
+                {% endif %}
+              </div>
+            </section>
+          {% endfor %}
+        </div>
+      </section>
+
+      <aside class="calendar-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Calendar</p>
+            <h2>Meetings</h2>
+          </div>
+          <i data-lucide="calendar-days"></i>
+        </div>
+
+        <div class="meeting-list">
+          {% for meeting in meetings %}
+            <article class="meeting-card">
+              <div>
+                <h3>{{ meeting.title }}</h3>
+                <p>{{ meeting.project_name or 'Unassigned' }}</p>
+              </div>
+              <span class="meeting-time">{{ meeting.starts_at }}</span>
+              {% if meeting.location %}
+                <span class="meeting-meta"><i data-lucide="map-pin"></i>{{ meeting.location }}</span>
+              {% endif %}
+              {% if meeting.attendees %}
+                <span class="meeting-meta"><i data-lucide="users"></i>{{ meeting.attendees }}</span>
+              {% endif %}
+              {% if meeting.project_git_url %}
+                <a class="text-link" href="{{ meeting.project_git_url }}" target="_blank" rel="noreferrer">
+                  <i data-lucide="external-link"></i>
+                  Git
+                </a>
+              {% endif %}
+              <details>
+                <summary>Edit</summary>
+                <form class="compact-form" method="post" action="{{ url_for('update_meeting', meeting_id=meeting.id) }}">
+                  <label class="full">
+                    <span>Title</span>
+                    <input name="title" type="text" value="{{ meeting.title }}" required>
+                  </label>
+                  <label>
+                    <span>Project</span>
+                    <select name="project_id">
+                      <option value="">Unassigned</option>
+                      {% for project in projects %}
+                        <option value="{{ project.id }}" {{ 'selected' if meeting.project_id == project.id else '' }}>{{ project.name }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Status</span>
+                    <select name="status">
+                      {% for status in meeting_statuses %}
+                        <option value="{{ status }}" {{ 'selected' if meeting.status == status else '' }}>{{ status }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Starts</span>
+                    <input name="starts_at" type="datetime-local" value="{{ meeting.starts_at }}" required>
+                  </label>
+                  <label>
+                    <span>Ends</span>
+                    <input name="ends_at" type="datetime-local" value="{{ meeting.ends_at or '' }}">
+                  </label>
+                  <label class="full">
+                    <span>Location</span>
+                    <input name="location" type="text" value="{{ meeting.location or '' }}">
+                  </label>
+                  <label class="full">
+                    <span>Attendees</span>
+                    <input name="attendees" type="text" value="{{ meeting.attendees or '' }}">
+                  </label>
+                  <label class="full">
+                    <span>Agenda</span>
+                    <textarea name="agenda" rows="2">{{ meeting.agenda or '' }}</textarea>
+                  </label>
+                  <button class="secondary" type="submit">
+                    <i data-lucide="save"></i>
+                    Save
+                  </button>
+                </form>
+                <form method="post" action="{{ url_for('delete_meeting', meeting_id=meeting.id) }}">
+                  <button class="danger full-width" type="submit">
+                    <i data-lucide="trash-2"></i>
+                    Delete
+                  </button>
+                </form>
+              </details>
+            </article>
+          {% else %}
+            <p class="empty-state">No meetings scheduled.</p>
+          {% endfor %}
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <dialog class="modal" data-add-dialog>
+    <div class="modal-header">
+      <div>
+        <p class="eyebrow">Create</p>
+        <h2>Add Item</h2>
+      </div>
+      <button class="icon-button ghost" type="button" data-close-add aria-label="Close add dialog" title="Close">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+
+    <div class="segmented-control" role="tablist" aria-label="Choose item type">
+      <button class="segment active" type="button" data-form-tab="project">Project</button>
+      <button class="segment" type="button" data-form-tab="task">Task</button>
+      <button class="segment" type="button" data-form-tab="meeting">Meeting</button>
+    </div>
+
+    <form class="modal-form active" method="post" action="{{ url_for('create_project') }}" data-add-form="project">
+      <label>
+        <span>Name</span>
+        <input name="name" type="text" required>
+      </label>
+      <label>
+        <span>Status</span>
+        <select name="status">
+          {% for status in project_statuses %}
+            <option value="{{ status }}" {{ 'selected' if status == 'Active' else '' }}>{{ status }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Completion</span>
+        <input name="completion" type="number" min="0" max="100" value="0">
+      </label>
+      <label class="full">
+        <span>Git URL</span>
+        <input name="git_url" type="url" placeholder="https://github.com/org/repo">
+      </label>
+      <label class="full">
+        <span>Description</span>
+        <textarea name="description" rows="3"></textarea>
+      </label>
+      <button class="primary full" type="submit">
+        <i data-lucide="plus"></i>
+        Add Project
+      </button>
+    </form>
+
+    <form class="modal-form" method="post" action="{{ url_for('create_task') }}" data-add-form="task">
+      <label class="full">
+        <span>Title</span>
+        <input name="title" type="text" required>
+      </label>
+      <label>
+        <span>Project</span>
+        <select name="project_id">
+          <option value="">Unassigned</option>
+          {% for project in projects %}
+            <option value="{{ project.id }}">{{ project.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Status</span>
+        <select name="status">
+          {% for status in task_statuses %}
+            <option value="{{ status }}">{{ status }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Priority</span>
+        <select name="priority">
+          {% for priority in task_priorities %}
+            <option value="{{ priority }}" {{ 'selected' if priority == 'Normal' else '' }}>{{ priority }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Due</span>
+        <input name="due_at" type="datetime-local">
+      </label>
+      <label class="full">
+        <span>Assignee</span>
+        <input name="assignee" type="text">
+      </label>
+      <label class="full">
+        <span>Notes</span>
+        <textarea name="notes" rows="3"></textarea>
+      </label>
+      <button class="primary full" type="submit">
+        <i data-lucide="plus"></i>
+        Add Task
+      </button>
+    </form>
+
+    <form class="modal-form" method="post" action="{{ url_for('create_meeting') }}" data-add-form="meeting">
+      <label class="full">
+        <span>Title</span>
+        <input name="title" type="text" required>
+      </label>
+      <label>
+        <span>Project</span>
+        <select name="project_id">
+          <option value="">Unassigned</option>
+          {% for project in projects %}
+            <option value="{{ project.id }}">{{ project.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Status</span>
+        <select name="status">
+          {% for status in meeting_statuses %}
+            <option value="{{ status }}">{{ status }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Starts</span>
+        <input name="starts_at" type="datetime-local" required>
+      </label>
+      <label>
+        <span>Ends</span>
+        <input name="ends_at" type="datetime-local">
+      </label>
+      <label class="full">
+        <span>Location</span>
+        <input name="location" type="text">
+      </label>
+      <label class="full">
+        <span>Attendees</span>
+        <input name="attendees" type="text">
+      </label>
+      <label class="full">
+        <span>Agenda</span>
+        <textarea name="agenda" rows="3"></textarea>
+      </label>
+      <button class="primary full" type="submit">
+        <i data-lucide="plus"></i>
+        Add Meeting
+      </button>
+    </form>
+  </dialog>
+
+  <script id="project-data" type="application/json">{{ project_summaries|tojson }}</script>
+  <script>
+    function escapeHTML(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      })[char]);
+    }
+
+    function refreshIcons() {
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    }
+
+    function projectMarkup(project) {
+      const name = escapeHTML(project.name);
+      const status = escapeHTML(project.status);
+      const description = escapeHTML(project.description);
+      const gitUrl = escapeHTML(project.git_url);
+      const gitLink = project.git_url
+        ? `<a class="text-link" href="${gitUrl}" target="_blank" rel="noreferrer"><i data-lucide="external-link"></i>Git Repository</a>`
+        : `<span class="muted-text">No Git link yet</span>`;
+      return `
+        <div class="detail-top">
+          <div>
+            <p class="eyebrow">Selected Project</p>
+            <h2>${name}</h2>
+            <span class="status-token">${status}</span>
+          </div>
+          <div class="pie" style="--value: ${project.completion * 3.6}deg">
+            <span>${project.completion}%</span>
+          </div>
+        </div>
+        <p class="detail-description">${description || "No description yet."}</p>
+        <div class="detail-stats">
+          <span><strong>${project.done_tasks}</strong> done</span>
+          <span><strong>${project.open_tasks}</strong> open</span>
+          <span><strong>${project.task_completion}%</strong> task completion</span>
+        </div>
+        <div class="detail-link-row">${gitLink}</div>
+        <details class="project-editor">
+          <summary><i data-lucide="square-pen"></i>Edit Project</summary>
+          <form class="compact-form" method="post" action="/projects/${project.id}">
+            <label>
+              <span>Name</span>
+              <input name="name" type="text" value="${name}" required>
+            </label>
+            <label>
+              <span>Status</span>
+              <select name="status">
+                ${["Planned", "Active", "Paused", "Done"].map((status) => `<option value="${status}" ${project.status === status ? "selected" : ""}>${status}</option>`).join("")}
+              </select>
+            </label>
+            <label class="full">
+              <span>Completion</span>
+              <input name="completion" type="range" min="0" max="100" value="${project.completion}">
+            </label>
+            <label class="full">
+              <span>Git URL</span>
+              <input name="git_url" type="url" value="${gitUrl}">
+            </label>
+            <label class="full">
+              <span>Description</span>
+              <textarea name="description" rows="3">${description}</textarea>
+            </label>
+            <button class="secondary" type="submit"><i data-lucide="save"></i>Save Project</button>
+          </form>
+          <form method="post" action="/projects/${project.id}/delete">
+            <button class="danger full-width" type="submit"><i data-lucide="trash-2"></i>Delete Project</button>
+          </form>
+        </details>
+      `;
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const addDialog = document.querySelector("[data-add-dialog]");
+      document.querySelector("[data-open-add]")?.addEventListener("click", () => addDialog.showModal());
+      document.querySelector("[data-close-add]")?.addEventListener("click", () => addDialog.close());
+
+      document.querySelectorAll("[data-form-tab]").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const target = tab.dataset.formTab;
+          document.querySelectorAll("[data-form-tab]").forEach((button) => button.classList.toggle("active", button === tab));
+          document.querySelectorAll("[data-add-form]").forEach((form) => form.classList.toggle("active", form.dataset.addForm === target));
+        });
+      });
+
+      const projects = JSON.parse(document.getElementById("project-data").textContent || "[]");
+      const detail = document.querySelector("[data-project-detail]");
+      const rows = document.querySelectorAll("[data-project-id]");
+
+      function selectProject(projectId) {
+        const project = projects.find((item) => String(item.id) === String(projectId));
+        if (!project || !detail) {
+          return;
+        }
+        rows.forEach((row) => row.classList.toggle("active", row.dataset.projectId === String(projectId)));
+        detail.innerHTML = projectMarkup(project);
+        refreshIcons();
+      }
+
+      rows.forEach((row) => row.addEventListener("click", () => selectProject(row.dataset.projectId)));
+      if (projects.length) {
+        selectProject(projects[0].id);
+      }
+
+      refreshIcons();
+    });
+  </script>
+</body>
+</html>
