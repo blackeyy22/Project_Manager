@@ -13,6 +13,7 @@ def test_dashboard_creates_database(tmp_path):
         {
             "TESTING": True,
             "DATABASE_PATH": str(tmp_path / "test.sqlite3"),
+            "DISCORD_WEBHOOK_URL": "",
             "SECRET_KEY": "test",
         }
     )
@@ -22,14 +23,27 @@ def test_dashboard_creates_database(tmp_path):
     assert response.status_code == 200
     assert b"Greenboard" in response.data
     assert b"Add Item" in response.data
+    assert b"Task Status" in response.data
+    assert b"Meeting Calendar" in response.data
 
 
 def test_create_project_task_and_meeting(tmp_path):
     db_path = tmp_path / "test.sqlite3"
     app = create_app(
-        {"TESTING": True, "DATABASE_PATH": str(db_path), "SECRET_KEY": "test"}
+        {
+            "TESTING": True,
+            "DATABASE_PATH": str(db_path),
+            "DISCORD_WEBHOOK_URL": "",
+            "SECRET_KEY": "test",
+        }
     )
     client = app.test_client()
+    meeting_start = datetime.now().replace(day=15, hour=10, minute=0).strftime(
+        "%Y-%m-%dT%H:%M"
+    )
+    meeting_end = datetime.now().replace(day=15, hour=10, minute=30).strftime(
+        "%Y-%m-%dT%H:%M"
+    )
 
     client.post(
         "/projects",
@@ -52,24 +66,39 @@ def test_create_project_task_and_meeting(tmp_path):
         },
     )
     client.post(
+        "/tasks",
+        data={
+            "project_id": "1",
+            "title": "Build prototype",
+            "status": "Doing",
+            "priority": "Normal",
+            "due_at": "2030-01-01T10:00",
+        },
+    )
+    client.post(
         "/meetings",
         data={
             "project_id": "1",
             "title": "Kickoff",
             "status": "Planned",
-            "starts_at": "2030-01-02T10:00",
-            "ends_at": "2030-01-02T10:30",
+            "starts_at": meeting_start,
+            "ends_at": meeting_end,
         },
     )
 
     db = sqlite3.connect(db_path)
     try:
         assert db.execute("SELECT COUNT(*) FROM projects").fetchone()[0] == 1
-        assert db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 2
         assert db.execute("SELECT COUNT(*) FROM meetings").fetchone()[0] == 1
         assert db.execute("SELECT completion FROM projects").fetchone()[0] == 35
     finally:
         db.close()
+
+    dashboard = client.get("/")
+    assert b"Doing Now" in dashboard.data
+    assert b"Build prototype" in dashboard.data
+    assert b"Kickoff" in dashboard.data
 
 
 def test_due_alert_json_without_webhook(tmp_path):
@@ -78,6 +107,7 @@ def test_due_alert_json_without_webhook(tmp_path):
         {
             "TESTING": True,
             "DATABASE_PATH": str(db_path),
+            "DISCORD_WEBHOOK_URL": "",
             "SECRET_KEY": "test",
             "ALERT_WINDOW_HOURS": 48,
         }
@@ -98,7 +128,12 @@ def test_due_alert_json_without_webhook(tmp_path):
 def test_database_self_heals_if_sqlite_file_is_recreated(tmp_path):
     db_path = tmp_path / "test.sqlite3"
     app = create_app(
-        {"TESTING": True, "DATABASE_PATH": str(db_path), "SECRET_KEY": "test"}
+        {
+            "TESTING": True,
+            "DATABASE_PATH": str(db_path),
+            "DISCORD_WEBHOOK_URL": "",
+            "SECRET_KEY": "test",
+        }
     )
     client = app.test_client()
 
@@ -116,7 +151,12 @@ def test_database_self_heals_if_sqlite_file_is_recreated(tmp_path):
 def test_stale_project_assignment_saves_unassigned(tmp_path):
     db_path = tmp_path / "test.sqlite3"
     app = create_app(
-        {"TESTING": True, "DATABASE_PATH": str(db_path), "SECRET_KEY": "test"}
+        {
+            "TESTING": True,
+            "DATABASE_PATH": str(db_path),
+            "DISCORD_WEBHOOK_URL": "",
+            "SECRET_KEY": "test",
+        }
     )
     client = app.test_client()
 

@@ -7,8 +7,9 @@ A dark green and black Python Flask web app for managing projects, tasks, meetin
 - Single Add button for creating projects, tasks, or meetings from one dialog.
 - Project tracking with status, completion percentage, description, and optional Git URL.
 - Clickable existing project list with a completion pie chart and inline project editor.
+- Task status pie chart showing Todo, Doing, Blocked, and Done work.
 - One task board grouped by Todo, Doing, Blocked, and Done.
-- One meeting calendar panel for scheduled meetings.
+- Full monthly meeting calendar with meetings shown on their dates.
 - Task tracking with project assignment, priority, status, due date, assignee, and notes.
 - Meeting calendar management with start/end times, location, attendees, and agenda.
 - Discord webhook alerts when projects, tasks, or meetings are created.
@@ -24,7 +25,7 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Edit `.env` or set environment variables before running the app:
+Edit `.env` or set environment variables before running the app. Keep real webhooks in `.env`; it is ignored by Git.
 
 ```powershell
 $env:SECRET_KEY = "replace-this"

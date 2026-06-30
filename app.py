@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 import json
 import os
 import sqlite3
@@ -184,10 +185,13 @@ def register_routes(app: Flask) -> None:
         ).fetchall()
         stats = load_stats(db)
         project_summaries = load_project_summaries(db, projects)
+        task_chart = load_task_chart(db)
+        calendar_month = load_calendar_month(meetings)
         discord_ready = bool(current_app.config.get("DISCORD_WEBHOOK_URL"))
 
         return render_template(
             "index.html",
+            calendar_month=calendar_month,
             discord_ready=discord_ready,
             meeting_statuses=MEETING_STATUSES,
             meetings=meetings,
@@ -195,6 +199,7 @@ def register_routes(app: Flask) -> None:
             projects=projects,
             project_summaries=project_summaries,
             stats=stats,
+            task_chart=task_chart,
             task_priorities=TASK_PRIORITIES,
             task_statuses=TASK_STATUSES,
             tasks=tasks,
@@ -543,6 +548,85 @@ def load_stats(db: sqlite3.Connection) -> dict[str, int]:
     }
 
 
+def load_task_chart(db: sqlite3.Connection) -> dict:
+    counts = {status: 0 for status in TASK_STATUSES}
+    for row in db.execute("SELECT status, COUNT(*) AS count FROM tasks GROUP BY status"):
+        if row["status"] in counts:
+            counts[row["status"]] = row["count"]
+
+    total = sum(counts.values())
+    done = counts["Done"]
+    doing = counts["Doing"]
+    blocked = counts["Blocked"]
+    todo = counts["Todo"]
+    done_degrees = round((done / total) * 360) if total else 0
+    doing_degrees = done_degrees + (round((doing / total) * 360) if total else 0)
+    blocked_degrees = doing_degrees + (round((blocked / total) * 360) if total else 0)
+
+    return {
+        "counts": counts,
+        "total": total,
+        "todo": todo,
+        "doing": doing,
+        "blocked": blocked,
+        "done": done,
+        "done_percent": round((done / total) * 100) if total else 0,
+        "doing_percent": round((doing / total) * 100) if total else 0,
+        "done_degrees": done_degrees,
+        "doing_degrees": doing_degrees,
+        "blocked_degrees": blocked_degrees,
+    }
+
+
+def load_calendar_month(meetings: list[sqlite3.Row]) -> dict:
+    today = datetime.now().date()
+    month_calendar = calendar.Calendar(firstweekday=0)
+    meetings_by_date: dict[str, list[dict]] = {}
+    for meeting in meetings:
+        starts_at = parse_datetime(meeting["starts_at"])
+        if starts_at is None:
+            continue
+
+        key = starts_at.date().isoformat()
+        meetings_by_date.setdefault(key, []).append(
+            {
+                "id": meeting["id"],
+                "project_id": meeting["project_id"],
+                "project_name": meeting["project_name"] or "Unassigned",
+                "project_git_url": meeting["project_git_url"] or "",
+                "title": meeting["title"],
+                "status": meeting["status"],
+                "starts_at": meeting["starts_at"],
+                "ends_at": meeting["ends_at"] or "",
+                "time": starts_at.strftime("%H:%M"),
+                "location": meeting["location"] or "",
+                "attendees": meeting["attendees"] or "",
+                "agenda": meeting["agenda"] or "",
+            }
+        )
+
+    weeks = []
+    for week in month_calendar.monthdatescalendar(today.year, today.month):
+        weeks.append(
+            [
+                {
+                    "date": day.isoformat(),
+                    "number": day.day,
+                    "in_month": day.month == today.month,
+                    "is_today": day == today,
+                    "meetings": meetings_by_date.get(day.isoformat(), []),
+                }
+                for day in week
+            ]
+        )
+
+    return {
+        "label": today.strftime("%B %Y"),
+        "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "weeks": weeks,
+    }
+
+
 def load_project_summaries(
     db: sqlite3.Connection, projects: list[sqlite3.Row]
 ) -> list[dict]:
@@ -661,6 +745,15 @@ def wants_json() -> bool:
 
 def current_timestamp() -> str:
     return datetime.now().strftime(DATETIME_FORMAT)
+
+
+def parse_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, DATETIME_FORMAT)
+    except ValueError:
+        return None
 
 
 def optional_value(field: str) -> str | None:
