@@ -123,6 +123,7 @@ def get_db() -> sqlite3.Connection:
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA foreign_keys = ON")
         g._database = db
+        ensure_schema(db)
     return db
 
 
@@ -133,13 +134,17 @@ def close_db(_error: Exception | None = None) -> None:
 
 
 def init_db() -> None:
-    get_db().executescript(SCHEMA)
-    migrate_db()
-    get_db().commit()
+    ensure_schema(get_db())
 
 
-def migrate_db() -> None:
-    db = get_db()
+def ensure_schema(db: sqlite3.Connection) -> None:
+    db.executescript(SCHEMA)
+    migrate_db(db)
+    db.commit()
+
+
+def migrate_db(db: sqlite3.Connection | None = None) -> None:
+    db = db or get_db()
     project_columns = {
         row["name"] for row in db.execute("PRAGMA table_info(projects)").fetchall()
     }
@@ -692,9 +697,17 @@ def optional_project_id() -> int | None:
     if not raw_value:
         return None
     try:
-        return int(raw_value)
+        project_id = int(raw_value)
     except ValueError:
         return None
+
+    project = get_db().execute(
+        "SELECT id FROM projects WHERE id = ?", (project_id,)
+    ).fetchone()
+    if project is None:
+        flash("Selected project was not found, so the item was saved unassigned.", "warning")
+        return None
+    return project_id
 
 
 def optional_datetime(field: str) -> str | None:
