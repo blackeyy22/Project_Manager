@@ -14,7 +14,6 @@
   --red: #df6b63;
   --amber: #c49a45;
   --blue: #6fa1d6;
-  --review: #8593b8;
   --todo: #556278;
   --status-empty: rgba(238, 244, 255, 0.08);
   --shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
@@ -25,8 +24,6 @@
   --dark-ink: #071120;
   --status-todo: var(--todo);
   --status-doing: var(--amber);
-  --status-review: var(--review);
-  --status-blocked: var(--red);
   --status-done: var(--green);
 }
 
@@ -329,7 +326,7 @@ h4 {
 
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(5, minmax(210px, 1fr));
+  grid-template-columns: repeat(3, minmax(210px, 1fr));
   gap: 10px;
   overflow-x: auto;
   min-height: 620px;
@@ -378,16 +375,6 @@ h4 {
 .status-dot.doing,
 .legend-dot.doing {
   background: var(--status-doing);
-}
-
-.status-dot.review,
-.legend-dot.review {
-  background: var(--status-review);
-}
-
-.status-dot.blocked,
-.legend-dot.blocked {
-  background: var(--status-blocked);
 }
 
 .status-dot.done,
@@ -1007,7 +994,7 @@ textarea:focus {
   }
 
   .kanban-board {
-    grid-template-columns: repeat(5, 82vw);
+    grid-template-columns: repeat(3, 82vw);
   }
 
   .calendar-grid {

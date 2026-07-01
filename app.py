@@ -26,7 +26,7 @@ DEFAULT_DB_PATH = BASE_DIR / "data" / "project_manager.sqlite3"
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M"
 
 PROJECT_STATUSES = ("Planned", "Active", "Paused", "Done")
-TASK_STATUSES = ("Todo", "Doing", "Review", "Blocked", "Done")
+TASK_STATUSES = ("Todo", "Doing", "Done")
 TASK_PRIORITIES = ("Low", "Normal", "High", "Critical")
 MEETING_STATUSES = ("Planned", "Held", "Cancelled")
 
@@ -152,6 +152,16 @@ def migrate_db(db: sqlite3.Connection | None = None) -> None:
     if "completion" not in project_columns:
         db.execute(
             "ALTER TABLE projects ADD COLUMN completion INTEGER NOT NULL DEFAULT 0"
+        )
+
+    legacy_task_statuses = {
+        "Review": "Doing",
+        "Blocked": "Todo",
+    }
+    for old_status, new_status in legacy_task_statuses.items():
+        db.execute(
+            "UPDATE tasks SET status = ? WHERE status = ?",
+            (new_status, old_status),
         )
 
 
@@ -559,9 +569,6 @@ def load_stats(db: sqlite3.Connection) -> dict[str, int]:
         "open_tasks": db.execute(
             "SELECT COUNT(*) FROM tasks WHERE status != 'Done'"
         ).fetchone()[0],
-        "blocked_tasks": db.execute(
-            "SELECT COUNT(*) FROM tasks WHERE status = 'Blocked'"
-        ).fetchone()[0],
         "planned_meetings": db.execute(
             "SELECT COUNT(*) FROM meetings WHERE status = 'Planned'"
         ).fetchone()[0],
@@ -596,8 +603,6 @@ def load_task_chart(db: sqlite3.Connection) -> dict:
         "total": total,
         "todo": counts["Todo"],
         "doing": counts["Doing"],
-        "review": counts["Review"],
-        "blocked": counts["Blocked"],
         "done": counts["Done"],
         "done_percent": round((counts["Done"] / total) * 100) if total else 0,
         "doing_percent": round((counts["Doing"] / total) * 100) if total else 0,

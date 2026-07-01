@@ -81,7 +81,7 @@ def test_create_project_task_and_meeting(tmp_path):
         data={
             "project_id": "1",
             "title": "QA handoff",
-            "status": "Review",
+            "status": "Done",
             "priority": "Critical",
             "due_at": "2030-01-01T11:00",
         },
@@ -128,15 +128,15 @@ def test_task_status_json_endpoint_moves_card(tmp_path):
     client.post("/tasks", data={"title": "Move me", "status": "Todo"})
     response = client.post(
         "/tasks/1/status",
-        json={"status": "Review"},
+        json={"status": "Doing"},
         headers={"Accept": "application/json"},
     )
 
     assert response.status_code == 200
-    assert response.get_json()["status"] == "Review"
+    assert response.get_json()["status"] == "Doing"
     db = sqlite3.connect(db_path)
     try:
-        assert db.execute("SELECT status FROM tasks WHERE id = 1").fetchone()[0] == "Review"
+        assert db.execute("SELECT status FROM tasks WHERE id = 1").fetchone()[0] == "Doing"
     finally:
         db.close()
 

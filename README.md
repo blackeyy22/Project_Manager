@@ -6,7 +6,7 @@ A dark green and black Python Flask web app for managing projects, tasks, meetin
 
 - Single Add button for creating projects, tasks, or meetings from one dialog.
 - Project tracking with status, completion percentage, description, and optional Git URL.
-- Professional kanban board with Todo, Doing, Review, Blocked, and Done lanes.
+- Professional kanban board with Todo, Doing, and Done lanes.
 - Drag and drop cards between lanes, with the status saved immediately.
 - Search, project, and priority filters for daily board focus.
 - Clickable project list with a completion pie chart and inline project editor.
