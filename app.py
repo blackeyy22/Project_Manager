@@ -154,15 +154,11 @@ def migrate_db(db: sqlite3.Connection | None = None) -> None:
             "ALTER TABLE projects ADD COLUMN completion INTEGER NOT NULL DEFAULT 0"
         )
 
-    legacy_task_statuses = {
-        "Review": "Doing",
-        "Blocked": "Todo",
-    }
-    for old_status, new_status in legacy_task_statuses.items():
-        db.execute(
-            "UPDATE tasks SET status = ? WHERE status = ?",
-            (new_status, old_status),
-        )
+    status_placeholders = ", ".join("?" for _ in TASK_STATUSES)
+    db.execute(
+        f"UPDATE tasks SET status = ? WHERE status NOT IN ({status_placeholders})",
+        ("Todo", *TASK_STATUSES),
+    )
 
 
 def register_routes(app: Flask) -> None:
