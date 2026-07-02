@@ -1,6 +1,6 @@
 # Project Manager
 
-A dark green and black Python Flask web app for managing projects, tasks, meeting calendars, Git repository links, and Discord alerts.
+A white, blue, and green Python Flask web app for managing projects, tasks, meeting calendars, Git repository links, and Discord alerts.
 
 ## Features
 
@@ -12,9 +12,14 @@ A dark green and black Python Flask web app for managing projects, tasks, meetin
 - Clickable project list with a completion pie chart and inline project editor.
 - Task status pie chart showing the current workflow mix.
 - Full monthly meeting calendar with meetings shown on their dates.
-- Task tracking with project assignment, priority, status, due date, assignee, and notes.
+- Login with admin and employee roles, user positions, and optional Discord user IDs.
+- Admins can assign tasks to anyone; employees can create their own tasks and move only their assigned tasks.
+- Task priority is calculated from the due date automatically.
+- Project completion is calculated from project task status: Todo, Doing, and Done.
+- Task tracking with project assignment, status, due date, assignee, and notes.
 - Meeting calendar management with start/end times, location, attendees, and agenda.
-- Discord webhook alerts when projects, tasks, or meetings are created.
+- Discord webhook alerts when projects, tasks, or meetings are created, when tasks are assigned or moved, and when meetings are updated.
+- Background Discord reminders for meetings starting in 5 minutes and a daily 9:00 greeting with the login link.
 - Manual due-soon alert sender for open tasks and planned meetings inside the configured alert window.
 - SQLite storage with no external database service required.
 
@@ -33,7 +38,12 @@ Edit `.env` or set environment variables before running the app. Keep real webho
 $env:SECRET_KEY = "replace-this"
 $env:DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
 $env:ALERT_WINDOW_HOURS = "24"
+$env:APP_PUBLIC_URL = "http://127.0.0.1:5000"
+$env:DEFAULT_ADMIN_USERNAME = "Robin@dreamsycn.com"
+$env:DEFAULT_ADMIN_PASSWORD = "Robin@1234"
 ```
+
+On the first run, the app creates a default admin user from `DEFAULT_ADMIN_USERNAME` and `DEFAULT_ADMIN_PASSWORD`. If you do not set them, the login is `Robin@dreamsycn.com` / `Robin@1234`; change it after signing in.
 
 ## Run
 
@@ -47,8 +57,12 @@ Open [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
 The app sends Discord messages through `DISCORD_WEBHOOK_URL`.
 
-- Create events send alerts immediately when the webhook is configured.
+- Project, task assignment, task movement, and meeting schedule events send alerts immediately when the webhook is configured.
 - The radio tower button sends alerts for tasks and meetings due within `ALERT_WINDOW_HOURS`.
+- The clock button manually runs scheduled checks.
+- The background scheduler checks every `AUTOMATION_POLL_SECONDS` seconds.
+- Meetings get a Discord reminder 5 minutes before start.
+- The daily greeting runs at `DAILY_GREETING_TIME`, default `09:00`, and includes `APP_PUBLIC_URL` as the login link.
 - The send button posts a test alert.
 
 The due alert endpoint can also be called by a scheduled job:

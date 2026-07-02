@@ -1,27 +1,27 @@
 :root {
-  --bg: #08111f;
-  --surface: #0f1729;
-  --surface-2: #131d33;
-  --surface-3: #18253e;
-  --line: #273553;
-  --line-strong: #4a6799;
-  --ink: #eef4ff;
-  --muted: #9aa9c7;
-  --green: #5ca0ff;
-  --green-2: #2f5fbf;
-  --accent-muted: #8eace0;
-  --green-soft: rgba(92, 160, 255, 0.12);
+  --bg: #f6fbff;
+  --surface: #ffffff;
+  --surface-2: #eef7ff;
+  --surface-3: #eaf8f0;
+  --line: #c8d9ea;
+  --line-strong: #3f8fdb;
+  --ink: #102638;
+  --muted: #5f7184;
+  --green: #19a66a;
+  --green-2: #0b7d57;
+  --accent-muted: #2563eb;
+  --green-soft: rgba(25, 166, 106, 0.13);
   --red: #df6b63;
-  --amber: #c49a45;
-  --blue: #6fa1d6;
-  --todo: #556278;
-  --status-empty: rgba(238, 244, 255, 0.08);
-  --shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
-  --field: rgba(7, 11, 20, 0.72);
-  --field-strong: rgba(7, 11, 20, 0.88);
-  --subtle: rgba(238, 244, 255, 0.045);
-  --success-ink: #dbe8ff;
-  --dark-ink: #071120;
+  --amber: #b47a18;
+  --blue: #2777c9;
+  --todo: #87a0b8;
+  --status-empty: rgba(16, 38, 56, 0.08);
+  --shadow: 0 18px 44px rgba(35, 75, 112, 0.13);
+  --field: rgba(255, 255, 255, 0.84);
+  --field-strong: #ffffff;
+  --subtle: rgba(39, 119, 201, 0.06);
+  --success-ink: #07543a;
+  --dark-ink: #ffffff;
   --status-todo: var(--todo);
   --status-doing: var(--amber);
   --status-done: var(--green);
@@ -32,14 +32,14 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   background:
-    linear-gradient(180deg, #08111f 0%, #0c1324 48%, #08111f 100%);
+    linear-gradient(180deg, #f6fbff 0%, #eef8f3 52%, #ffffff 100%);
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -100,7 +100,7 @@ h4 {
   gap: 16px;
   min-height: 70px;
   border-bottom: 1px solid var(--line);
-  background: rgba(8, 12, 22, 0.92);
+  background: rgba(255, 255, 255, 0.92);
   padding: 14px clamp(14px, 2.4vw, 28px);
   position: sticky;
   top: 0;
@@ -136,6 +136,7 @@ h4 {
 }
 
 .status-pill,
+.user-pill,
 .status-token,
 .priority {
   display: inline-flex;
@@ -160,6 +161,12 @@ h4 {
   color: var(--muted);
 }
 
+.user-pill {
+  border-color: rgba(142, 172, 224, 0.28);
+  background: rgba(142, 172, 224, 0.08);
+  color: var(--ink);
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: minmax(230px, 0.68fr) minmax(680px, 2fr) minmax(280px, 0.82fr);
@@ -178,7 +185,7 @@ h4 {
 .modal {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(19, 29, 51, 0.98), rgba(10, 17, 31, 0.98));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 248, 255, 0.98));
   box-shadow: var(--shadow);
 }
 
@@ -241,6 +248,7 @@ h4 {
 }
 
 .project-list,
+.user-list,
 .task-stack,
 .meeting-list,
 .task-legend,
@@ -291,7 +299,50 @@ h4 {
 .mini-progress {
   height: 7px;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--green) var(--progress), rgba(238, 244, 255, 0.1) 0);
+  background: linear-gradient(90deg, var(--green) var(--progress), rgba(16, 38, 56, 0.1) 0);
+}
+
+.team-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.compact-heading {
+  margin-bottom: 0;
+}
+
+.team-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.user-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 8px;
+}
+
+.user-row summary {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  color: var(--ink);
+}
+
+.user-row summary span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.user-row summary small {
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .board-toolbar {
@@ -335,15 +386,15 @@ h4 {
 
 .kanban-column {
   min-width: 210px;
-  border: 1px solid rgba(74, 103, 153, 0.44);
+  border: 1px solid rgba(63, 143, 219, 0.3);
   border-radius: 8px;
-  background: rgba(7, 11, 20, 0.46);
+  background: rgba(255, 255, 255, 0.72);
   padding: 8px;
 }
 
 .kanban-column.drag-over {
-  border-color: rgba(92, 160, 255, 0.58);
-  background: rgba(92, 160, 255, 0.08);
+  border-color: rgba(25, 166, 106, 0.52);
+  background: rgba(25, 166, 106, 0.08);
 }
 
 .column-heading {
@@ -397,14 +448,14 @@ h4 {
   border: 1px solid var(--line);
   border-left: 3px solid var(--line-strong);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(24, 37, 62, 0.98), rgba(15, 23, 41, 0.98));
+  background: linear-gradient(180deg, #ffffff, #f4f9ff);
   min-width: 0;
   padding: 10px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 10px 24px rgba(35, 75, 112, 0.11);
 }
 
 .kanban-card:hover {
-  border-color: rgba(92, 160, 255, 0.42);
+  border-color: rgba(25, 166, 106, 0.42);
 }
 
 .kanban-card.dragging {
@@ -518,7 +569,7 @@ h4 {
 
 .pie {
   width: 84px;
-  background: conic-gradient(var(--green) var(--value), rgba(238, 244, 255, 0.08) 0);
+  background: conic-gradient(var(--green) var(--value), rgba(16, 38, 56, 0.08) 0);
 }
 
 .task-pie {
@@ -583,7 +634,7 @@ h4 {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 7px 9px;
-  background: rgba(7, 11, 20, 0.54);
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .legend-dot {
@@ -592,7 +643,7 @@ h4 {
 
 .detail-description {
   margin: 10px 0;
-  color: #cdd9f3;
+  color: #355169;
   font-size: 0.84rem;
   line-height: 1.4;
 }
@@ -893,8 +944,14 @@ textarea:focus {
 }
 
 .compact-form .full,
-.modal-form .full {
+.modal-form .full,
+.team-form .full,
+.single-column {
   grid-column: 1 / -1;
+}
+
+.single-column {
+  grid-template-columns: 1fr;
 }
 
 .modal {
@@ -940,6 +997,10 @@ textarea:focus {
   color: var(--green);
 }
 
+.segmented-control:has(.segment:only-child) {
+  grid-template-columns: 1fr;
+}
+
 .modal-form {
   display: none;
 }
@@ -950,6 +1011,38 @@ textarea:focus {
 
 [hidden] {
   display: none !important;
+}
+
+.auth-body {
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.auth-shell {
+  width: min(440px, 100%);
+}
+
+.auth-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 248, 255, 0.98));
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.auth-panel h1 {
+  font-size: 1.55rem;
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+.inline-flashes {
+  width: 100%;
+  margin: 0 0 12px;
 }
 
 @media (max-width: 1360px) {
@@ -989,6 +1082,7 @@ textarea:focus {
   .insight-sidebar,
   .compact-form,
   .modal-form,
+  .team-form,
   .detail-stats {
     grid-template-columns: 1fr;
   }
