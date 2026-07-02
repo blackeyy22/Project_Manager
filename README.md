@@ -39,8 +39,8 @@ $env:SECRET_KEY = "replace-this"
 $env:DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
 $env:ALERT_WINDOW_HOURS = "24"
 $env:APP_PUBLIC_URL = "http://127.0.0.1:5000"
-$env:DEFAULT_ADMIN_USERNAME = "Robin@dreamsycn.com"
-$env:DEFAULT_ADMIN_PASSWORD = "Robin@1234"
+$env:DEFAULT_ADMIN_USERNAME = "replace this"
+$env:DEFAULT_ADMIN_PASSWORD = "replace this"
 ```
 
 On the first run, the app creates a default admin user from `DEFAULT_ADMIN_USERNAME` and `DEFAULT_ADMIN_PASSWORD`. If you do not set them, the login is `Robin@dreamsycn.com` / `Robin@1234`; change it after signing in.
