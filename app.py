@@ -352,9 +352,9 @@ def register_routes(app: Flask) -> None:
             + "\nORDER BY meetings.starts_at ASC",
             meeting_params,
         ).fetchall()
-        stats = load_stats(db)
+        stats = load_visible_stats(projects, tasks, meetings)
         project_summaries = load_project_summaries(db, projects)
-        task_chart = load_task_chart(db)
+        task_chart = load_task_chart(tasks)
         calendar_month = load_calendar_month(meetings, tasks)
         discord_ready = bool(
             current_app.config.get("ADMIN_DISCORD_WEBHOOK_URL")
@@ -388,6 +388,8 @@ def register_routes(app: Flask) -> None:
             current_user=g.current_user,
             discord_ready=discord_ready,
             is_admin=is_admin(),
+            is_client=is_client(),
+            is_employee=is_employee(),
             meeting_statuses=MEETING_STATUSES,
             meetings=meetings,
             project_statuses=PROJECT_STATUSES,
@@ -530,7 +532,7 @@ def register_routes(app: Flask) -> None:
         return redirect(url_for("dashboard"))
 
     @app.post("/tasks/<int:task_id>")
-    @admin_required
+    @login_required
     def update_task(task_id: int):
         title = require_value("title", "Task title")
         if not title:
@@ -540,6 +542,9 @@ def register_routes(app: Flask) -> None:
         old_task = load_task_detail(db, task_id)
         if old_task is None:
             flash("Task was not found.", "error")
+            return redirect(url_for("dashboard"))
+        if not can_manage_project_work(old_task["project_id"]):
+            flash("Only admins and project clients can edit that task.", "error")
             return redirect(url_for("dashboard"))
 
         due_at = optional_datetime("due_at")
@@ -619,9 +624,16 @@ def register_routes(app: Flask) -> None:
         return redirect(url_for("dashboard"))
 
     @app.post("/tasks/<int:task_id>/delete")
-    @admin_required
+    @login_required
     def delete_task(task_id: int):
         db = get_db()
+        task = load_task_detail(db, task_id)
+        if task is None:
+            flash("Task was not found.", "error")
+            return redirect(url_for("dashboard"))
+        if not can_manage_project_work(task["project_id"]):
+            flash("Only admins and project clients can delete that task.", "error")
+            return redirect(url_for("dashboard"))
         db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
         refresh_project_completion(db)
         db.commit()
@@ -629,8 +641,13 @@ def register_routes(app: Flask) -> None:
         return redirect(url_for("dashboard"))
 
     @app.post("/meetings")
-    @admin_required
+    @login_required
     def create_meeting():
+        project_id = optional_project_id()
+        if not can_manage_project_work(project_id):
+            flash("Only admins and project clients can manage meetings.", "error")
+            return redirect(url_for("dashboard"))
+
         title = require_value("title", "Meeting title")
         starts_at = optional_datetime("starts_at")
         if not title or not starts_at:
@@ -649,7 +666,7 @@ def register_routes(app: Flask) -> None:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                optional_project_id(),
+                project_id,
                 title,
                 choose("status", MEETING_STATUSES, "Planned"),
                 starts_at,
@@ -679,6 +696,7 @@ def register_routes(app: Flask) -> None:
                 f"Project: {meeting['project_name'] or 'Unassigned'}",
                 f"Starts: {meeting['starts_at']}",
                 f"Location: {meeting['location'] or 'Not set'}",
+                f"Scheduled by: {g.current_user['display_name']}",
             ],
             get_notification_webhooks(project=meeting),
         )
@@ -686,7 +704,7 @@ def register_routes(app: Flask) -> None:
         return redirect(url_for("dashboard"))
 
     @app.post("/meetings/<int:meeting_id>")
-    @admin_required
+    @login_required
     def update_meeting(meeting_id: int):
         title = require_value("title", "Meeting title")
         starts_at = optional_datetime("starts_at")
@@ -696,6 +714,14 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("dashboard"))
 
         db = get_db()
+        old_meeting = load_meeting_detail(db, meeting_id)
+        if old_meeting is None:
+            flash("Meeting was not found.", "error")
+            return redirect(url_for("dashboard"))
+        if not can_manage_project_work(old_meeting["project_id"]):
+            flash("Only admins and project clients can edit that meeting.", "error")
+            return redirect(url_for("dashboard"))
+        project_id = optional_project_id()
         db.execute(
             """
             UPDATE meetings
@@ -704,7 +730,7 @@ def register_routes(app: Flask) -> None:
             WHERE id = ?
             """,
             (
-                optional_project_id(),
+                project_id,
                 title,
                 choose("status", MEETING_STATUSES, "Planned"),
                 starts_at,
@@ -726,6 +752,7 @@ def register_routes(app: Flask) -> None:
                     f"Project: {meeting['project_name'] or 'Unassigned'}",
                     f"Starts: {meeting['starts_at']}",
                     f"Location: {meeting['location'] or 'Not set'}",
+                    f"Updated by: {g.current_user['display_name']}",
                 ],
                 get_notification_webhooks(project=meeting),
             )
@@ -733,9 +760,16 @@ def register_routes(app: Flask) -> None:
         return redirect(url_for("dashboard"))
 
     @app.post("/meetings/<int:meeting_id>/delete")
-    @admin_required
+    @login_required
     def delete_meeting(meeting_id: int):
         db = get_db()
+        meeting = load_meeting_detail(db, meeting_id)
+        if meeting is None:
+            flash("Meeting was not found.", "error")
+            return redirect(url_for("dashboard"))
+        if not can_manage_project_work(meeting["project_id"]):
+            flash("Only admins and project clients can delete that meeting.", "error")
+            return redirect(url_for("dashboard"))
         db.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
         db.commit()
         flash("Meeting deleted.", "success")
@@ -1014,6 +1048,18 @@ def project_matches_current_user(project_id: int | None) -> bool:
     return bool(project_id is not None and user and user["project_id"] == project_id)
 
 
+def can_manage_project_work(project_id: int | None) -> bool:
+    if is_admin():
+        return True
+    user = g.get("current_user")
+    return bool(
+        is_client()
+        and user
+        and project_id is not None
+        and user["project_id"] == project_id
+    )
+
+
 def seed_default_admin(db: sqlite3.Connection) -> None:
     if db.execute("SELECT COUNT(*) FROM users").fetchone()[0]:
         return
@@ -1099,7 +1145,7 @@ def refresh_project_completion(db: sqlite3.Connection) -> None:
 
 
 def resolve_task_assignee(db: sqlite3.Connection) -> sqlite3.Row | None:
-    if not is_admin():
+    if is_employee():
         return g.current_user
 
     raw_value = request.form.get("assignee_user_id", "").strip()
@@ -1117,6 +1163,13 @@ def resolve_task_assignee(db: sqlite3.Connection) -> sqlite3.Row | None:
     ).fetchone()
     if user is None:
         flash("Selected assignee was not found, so the task was saved unassigned.", "warning")
+        return None
+    if is_client() and user["project_id"] != g.current_user["project_id"]:
+        flash(
+            "Clients can assign tasks only to members in their project.",
+            "warning",
+        )
+        return None
     return user
 
 
@@ -1127,7 +1180,10 @@ def load_task_detail(db: sqlite3.Connection, task_id: int) -> sqlite3.Row | None
             projects.git_url AS project_git_url,
             projects.drive_url AS project_drive_url,
             projects.client_webhook_url AS project_client_webhook_url,
-            users.display_name AS assignee_name, users.username AS assignee_username,
+            users.display_name AS assignee_name,
+            users.username AS assignee_username,
+            users.position AS assignee_position,
+            users.role AS assignee_role,
             users.discord_user_id AS assignee_discord_user_id
         FROM tasks
         LEFT JOIN projects ON projects.id = tasks.project_id
@@ -1165,6 +1221,14 @@ def task_assignee_mention(task: sqlite3.Row) -> str:
     return label
 
 
+def task_assignee_identity(task: sqlite3.Row) -> str:
+    if task["assignee_position"]:
+        return task["assignee_position"]
+    if task["assignee_role"]:
+        return task["assignee_role"].title()
+    return ""
+
+
 def can_change_task_status(task: sqlite3.Row) -> bool:
     if is_admin():
         return True
@@ -1191,16 +1255,24 @@ def notify_task_assignment(task: sqlite3.Row | None, title: str) -> None:
         (task["project_id"],),
     ).fetchone()
     actor_name = g.current_user["display_name"] if g.get("current_user") else "System"
-    notify_event(
-        title,
+    assignee_identity = task_assignee_identity(task)
+    lines = [
+        f"Task: {task['title']}",
+        f"Assigned to: {task_assignee_mention(task)}",
+    ]
+    if assignee_identity:
+        lines.append(f"Assignee role: {assignee_identity}")
+    lines.extend(
         [
-            f"Task: {task['title']}",
-            f"Assigned to: {task_assignee_mention(task)}",
             f"Project: {task['project_name'] or 'Unassigned'}",
             f"Priority: {task['priority']}",
             f"Due: {task['due_at'] or 'No due date'}",
             f"Updated by: {actor_name}",
-        ],
+        ]
+    )
+    notify_event(
+        title,
+        lines,
         get_notification_webhooks(task=task, project=project, include_employee=True),
     )
 
@@ -1266,7 +1338,8 @@ def send_meeting_reminders(db: sqlite3.Connection, now: datetime) -> int:
         """
         SELECT meetings.*, projects.name AS project_name,
             projects.git_url AS project_git_url,
-            projects.drive_url AS project_drive_url
+            projects.drive_url AS project_drive_url,
+            projects.client_webhook_url
         FROM meetings
         LEFT JOIN projects ON projects.id = meetings.project_id
         WHERE meetings.status = 'Planned'
@@ -1280,7 +1353,7 @@ def send_meeting_reminders(db: sqlite3.Connection, now: datetime) -> int:
 
     sent_count = 0
     for meeting in meetings:
-        sent, _message = send_discord_alert(
+        sent, _message = send_discord_alerts(
             "Meeting starts in 5 minutes",
             [
                 f"Meeting: {meeting['title']}",
@@ -1289,6 +1362,7 @@ def send_meeting_reminders(db: sqlite3.Connection, now: datetime) -> int:
                 f"Location: {meeting['location'] or 'Not set'}",
                 f"Login: {current_app.config['APP_PUBLIC_URL']}",
             ],
+            get_notification_webhooks(project=meeting),
         )
         if sent:
             db.execute(
@@ -1360,11 +1434,30 @@ def load_stats(db: sqlite3.Connection) -> dict[str, int]:
     }
 
 
-def load_task_chart(db: sqlite3.Connection) -> dict:
+def load_visible_stats(
+    projects: list[sqlite3.Row], tasks: list[sqlite3.Row], meetings: list[sqlite3.Row]
+) -> dict[str, int]:
+    completion_values = [project["completion"] or 0 for project in projects]
+    avg_completion = (
+        round(sum(completion_values) / len(completion_values))
+        if completion_values
+        else 0
+    )
+    return {
+        "active_projects": sum(1 for project in projects if project["status"] == "Active"),
+        "open_tasks": sum(1 for task in tasks if task["status"] != "Done"),
+        "planned_meetings": sum(
+            1 for meeting in meetings if meeting["status"] == "Planned"
+        ),
+        "avg_completion": avg_completion,
+    }
+
+
+def load_task_chart(tasks: list[sqlite3.Row]) -> dict:
     counts = {status: 0 for status in TASK_STATUSES}
-    for row in db.execute("SELECT status, COUNT(*) AS count FROM tasks GROUP BY status"):
-        if row["status"] in counts:
-            counts[row["status"]] = row["count"]
+    for task in tasks:
+        if task["status"] in counts:
+            counts[task["status"]] += 1
 
     total = sum(counts.values())
     cursor = 0
@@ -1617,7 +1710,14 @@ def get_notification_webhooks(task: sqlite3.Row | None = None, project: sqlite3.
         elif client_url:
             urls.append(client_url)
 
-    if include_employee and task is not None and emp_url:
+    has_assignee = bool(
+        task is not None
+        and (
+            task["assignee_user_id"] is not None
+            or (task["assignee"] or "").strip()
+        )
+    )
+    if include_employee and has_assignee and emp_url:
         urls.append(emp_url)
 
     return urls
@@ -1714,6 +1814,8 @@ def optional_project_id() -> int | None:
                 "Selected project was not found, so the item was saved unassigned.",
                 "warning",
             )
+            if is_client():
+                return g.current_user["project_id"]
             return None
 
         if is_client() and g.current_user["project_id"] != project_id:

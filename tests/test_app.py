@@ -14,6 +14,9 @@ def make_app(tmp_path, **overrides):
         "TESTING": True,
         "DATABASE_PATH": str(tmp_path / "test.sqlite3"),
         "DISCORD_WEBHOOK_URL": "",
+        "ADMIN_DISCORD_WEBHOOK_URL": "",
+        "CLIENT_DISCORD_WEBHOOK_URL": "",
+        "EMP_DISCORD_WEBHOOK_URL": "",
         "SECRET_KEY": "test",
         "DEFAULT_ADMIN_USERNAME": "admin@example.test",
         "DEFAULT_ADMIN_PASSWORD": "test-admin-password",
@@ -30,18 +33,33 @@ def login(client, username="admin@example.test", password="test-admin-password")
     )
 
 
-def create_employee(client, username="dev", password="dev123"):
+def create_user(
+    client,
+    username="dev",
+    password="dev123",
+    display_name="Dev User",
+    role="employee",
+    position="Developer",
+    project_id=None,
+):
+    data = {
+        "username": username,
+        "password": password,
+        "display_name": display_name,
+        "role": role,
+        "position": position,
+        "discord_user_id": "123456",
+    }
+    if project_id is not None:
+        data["project_id"] = str(project_id)
     client.post(
         "/users",
-        data={
-            "username": username,
-            "password": password,
-            "display_name": "Dev User",
-            "role": "employee",
-            "position": "Developer",
-            "discord_user_id": "123456",
-        },
+        data=data,
     )
+
+
+def create_employee(client, username="dev", password="dev123", project_id=None):
+    create_user(client, username=username, password=password, project_id=project_id)
 
 
 def test_dashboard_requires_login_and_admin_can_enter(tmp_path):
@@ -311,6 +329,179 @@ def test_employee_can_create_self_task_and_only_move_own_tasks(tmp_path):
     assert forbidden_move.status_code == 403
 
 
+def test_client_manages_only_their_project_work(tmp_path):
+    db_path = tmp_path / "test.sqlite3"
+    app = make_app(tmp_path, DATABASE_PATH=str(db_path))
+    client = app.test_client()
+    login(client)
+
+    client.post("/projects", data={"name": "Client project", "status": "Active"})
+    client.post("/projects", data={"name": "Other project", "status": "Active"})
+    create_user(
+        client,
+        username="project-dev",
+        password="dev123",
+        display_name="Project Dev",
+        role="employee",
+        project_id=1,
+    )
+    create_user(
+        client,
+        username="outside-dev",
+        password="dev123",
+        display_name="Outside Dev",
+        role="employee",
+        project_id=2,
+    )
+    create_user(
+        client,
+        username="client-user",
+        password="client123",
+        display_name="Client User",
+        role="client",
+        position="Client",
+        project_id=1,
+    )
+    client.post(
+        "/tasks",
+        data={"project_id": "1", "title": "Visible task", "assignee_user_id": "2"},
+    )
+    client.post(
+        "/tasks",
+        data={"project_id": "2", "title": "Hidden task", "assignee_user_id": "3"},
+    )
+
+    client.post("/logout")
+    login(client, "client-user", "client123")
+    dashboard = client.get("/")
+    assert b"Visible task" in dashboard.data
+    assert b"Hidden task" not in dashboard.data
+    assert b"Project Dev" in dashboard.data
+    assert b"Outside Dev" not in dashboard.data
+    assert b"data-form-tab=\"meeting\"" in dashboard.data
+    assert b"data-form-tab=\"project\"" not in dashboard.data
+
+    client.post(
+        "/tasks",
+        data={
+            "project_id": "2",
+            "title": "Client-created task",
+            "assignee_user_id": "2",
+        },
+    )
+    client.post(
+        "/tasks",
+        data={
+            "project_id": "1",
+            "title": "Wrong assignee",
+            "assignee_user_id": "3",
+        },
+    )
+    starts_at = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
+    client.post(
+        "/meetings",
+        data={"project_id": "2", "title": "Client sync", "starts_at": starts_at},
+    )
+    allowed_move = client.post(
+        "/tasks/1/status",
+        json={"status": "Doing"},
+        headers={"Accept": "application/json"},
+    )
+    forbidden_move = client.post(
+        "/tasks/2/status",
+        json={"status": "Doing"},
+        headers={"Accept": "application/json"},
+    )
+
+    assert allowed_move.status_code == 200
+    assert forbidden_move.status_code == 403
+
+    db = sqlite3.connect(db_path)
+    try:
+        assert (
+            db.execute(
+                "SELECT project_id, assignee_user_id FROM tasks WHERE title = ?",
+                ("Client-created task",),
+            ).fetchone()
+            == (1, 2)
+        )
+        assert (
+            db.execute(
+                "SELECT project_id, assignee_user_id FROM tasks WHERE title = ?",
+                ("Wrong assignee",),
+            ).fetchone()
+            == (1, None)
+        )
+        assert (
+            db.execute(
+                "SELECT project_id FROM meetings WHERE title = ?",
+                ("Client sync",),
+            ).fetchone()[0]
+            == 1
+        )
+    finally:
+        db.close()
+
+
+def test_discord_webhooks_route_by_event_type(tmp_path, monkeypatch):
+    app = make_app(
+        tmp_path,
+        ADMIN_DISCORD_WEBHOOK_URL="admin-hook",
+        CLIENT_DISCORD_WEBHOOK_URL="global-client-hook",
+        EMP_DISCORD_WEBHOOK_URL="employee-hook",
+    )
+    client = app.test_client()
+    login(client)
+
+    sent_messages = []
+
+    def fake_send(title, lines, webhook_url=None):
+        sent_messages.append((title, lines, webhook_url))
+        return True, "sent"
+
+    monkeypatch.setattr(app_module, "send_discord_alert", fake_send)
+
+    client.post(
+        "/projects",
+        data={
+            "name": "Webhook project",
+            "status": "Active",
+            "client_webhook_url": "project-client-hook",
+        },
+    )
+    create_employee(client, project_id=1)
+    sent_messages.clear()
+
+    client.post(
+        "/tasks",
+        data={"project_id": "1", "title": "Notify me", "assignee_user_id": "2"},
+    )
+    assignment_urls = {
+        webhook_url
+        for title, _lines, webhook_url in sent_messages
+        if title == "Task assigned"
+    }
+    assert assignment_urls == {
+        "admin-hook",
+        "project-client-hook",
+        "employee-hook",
+    }
+
+    sent_messages.clear()
+    response = client.post(
+        "/tasks/1/status",
+        json={"status": "Doing"},
+        headers={"Accept": "application/json"},
+    )
+    assert response.status_code == 200
+    move_urls = {
+        webhook_url
+        for title, _lines, webhook_url in sent_messages
+        if title == "Task moved"
+    }
+    assert move_urls == {"admin-hook", "project-client-hook"}
+
+
 def test_scheduled_discord_jobs_send_meeting_reminder_and_daily_greeting(
     tmp_path, monkeypatch
 ):
@@ -318,7 +509,7 @@ def test_scheduled_discord_jobs_send_meeting_reminder_and_daily_greeting(
     app = make_app(
         tmp_path,
         DATABASE_PATH=str(db_path),
-        DISCORD_WEBHOOK_URL="https://discord.test/webhook",
+        ADMIN_DISCORD_WEBHOOK_URL="https://discord.test/webhook",
         DAILY_GREETING_TIME=datetime.now().strftime("%H:%M"),
         DAILY_GREETING_GRACE_MINUTES=60,
     )
@@ -333,8 +524,8 @@ def test_scheduled_discord_jobs_send_meeting_reminder_and_daily_greeting(
 
     sent_messages = []
 
-    def fake_send(title, lines):
-        sent_messages.append((title, lines))
+    def fake_send(title, lines, webhook_url=None):
+        sent_messages.append((title, lines, webhook_url))
         return True, "sent"
 
     monkeypatch.setattr(app_module, "send_discord_alert", fake_send)
@@ -343,8 +534,12 @@ def test_scheduled_discord_jobs_send_meeting_reminder_and_daily_greeting(
         result = app_module.run_scheduled_discord_jobs(app_module.get_db())
 
     assert result["sent"] == 2
-    assert "Meeting starts in 5 minutes" in [title for title, _lines in sent_messages]
-    assert "Good morning" in [title for title, _lines in sent_messages]
+    assert "Meeting starts in 5 minutes" in [
+        title for title, _lines, _webhook_url in sent_messages
+    ]
+    assert "Good morning" in [
+        title for title, _lines, _webhook_url in sent_messages
+    ]
 
     db = sqlite3.connect(db_path)
     try:

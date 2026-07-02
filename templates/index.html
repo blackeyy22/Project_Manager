@@ -276,7 +276,7 @@
               {% for task in tasks %}
                 {% if task.status == status %}
                   <article
-                    class="kanban-card priority-{{ task.priority|lower }} {{ 'done-task' if task.status == 'Done' else '' }}"
+                    class="kanban-card {{ 'done-task' if task.status == 'Done' else 'priority-' ~ task.priority|lower }}"
                     draggable="true"
                     data-task-card
                     data-task-id="{{ task.id }}"
@@ -316,8 +316,8 @@
                       <p class="card-notes">{{ task.notes }}</p>
                     {% endif %}
                     <details>
-                      <summary><i data-lucide="square-pen"></i>{{ 'Edit' if is_admin else 'Status' }}</summary>
-                      {% if is_admin %}
+                      <summary><i data-lucide="square-pen"></i>{{ 'Edit' if is_admin or is_client else 'Status' }}</summary>
+                      {% if is_admin or is_client %}
                         <form class="compact-form" method="post" action="{{ url_for('update_task', task_id=task.id) }}">
                           <label class="full">
                             <span>Title</span>
@@ -405,7 +405,7 @@
           <i data-lucide="pie-chart"></i>
         </div>
         <div class="task-pie-wrap">
-          <div class="task-pie" style="background: conic-gradient">
+          <div class="task-pie" style="background: conic-gradient({{ task_chart.gradient }})">
             <span>{{ task_chart.doing_percent }}%</span> 
             <small>Doing</small>
           </div>
@@ -447,7 +447,7 @@
       <div class="panel-heading">
         <div>
           <p class="eyebrow">Calendar</p>
-          <h2>Meeting Calendar - {{ calendar_month.label }}</h2>
+          <h2>Schedule Calendar - {{ calendar_month.label }}</h2>
         </div>
         <i data-lucide="calendar-days"></i>
       </div>
@@ -475,7 +475,9 @@
                     {% if event.type == 'task' %}
                       <p><small>Due: {{ event.due_at }}</small></p>
                       <p><small>Assignee: {{ event.assignee_name }}</small></p>
-                      <p><small>Priority: {{ event.priority }}</small></p>
+                      {% if event.status != 'Done' %}
+                        <p><small>Priority: {{ event.priority }}</small></p>
+                      {% endif %}
                     {% endif %}
                     {% if event.location %}
                       <p><i data-lucide="map-pin"></i>{{ event.location }}</p>
@@ -518,6 +520,9 @@
       {% if is_admin %}
         <button class="segment active" type="button" data-form-tab="project">Project</button>
         <button class="segment" type="button" data-form-tab="task">Task</button>
+        <button class="segment" type="button" data-form-tab="meeting">Meeting</button>
+      {% elif is_client %}
+        <button class="segment active" type="button" data-form-tab="task">Task</button>
         <button class="segment" type="button" data-form-tab="meeting">Meeting</button>
       {% else %}
         <button class="segment active" type="button" data-form-tab="task">Task</button>
@@ -589,7 +594,7 @@
       </label>
       <label class="full">
         <span>Assignee</span>
-        {% if is_admin %}
+        {% if is_admin or is_client %}
           <select name="assignee_user_id">
             <option value="">Unassigned</option>
             {% for user in users %}
@@ -610,7 +615,7 @@
       </button>
     </form>
 
-    {% if is_admin %}
+    {% if is_admin or is_client %}
     <form class="modal-form" method="post" action="{{ url_for('create_meeting') }}" data-add-form="meeting">
       <label class="full">
         <span>Title</span>
@@ -683,7 +688,7 @@
       }
     }
 
-    const canManageProjects = is_admin ? true : false;
+    const canManageProjects = {{ 'true' if is_admin else 'false' }};
 
     function projectMarkup(project) {
       const name = escapeHTML(project.name);
@@ -875,6 +880,22 @@
       setupDragAndDrop();
       applyFilters();
       updateColumnCounts();
+      let formDirty = false;
+      document.querySelectorAll("input, select, textarea").forEach((field) => {
+        field.addEventListener("input", () => {
+          formDirty = true;
+        });
+        field.addEventListener("change", () => {
+          formDirty = true;
+        });
+      });
+      setInterval(() => {
+        const addDialogOpen = document.querySelector("[data-add-dialog]")?.open;
+        const detailsOpen = Boolean(document.querySelector("details[open]"));
+        if (!document.hidden && !formDirty && !addDialogOpen && !detailsOpen) {
+          window.location.reload();
+        }
+      }, 30000);
       refreshIcons();
     });
   </script>

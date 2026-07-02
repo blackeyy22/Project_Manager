@@ -8,17 +8,17 @@ A white, blue, and green Python Flask web app for managing projects, tasks, meet
 - Project tracking with status, completion percentage, description, and optional Git/Drive URLs.
 - Professional kanban board with Todo, Doing, and Done lanes.
 - Drag and drop cards between lanes, with the status saved immediately.
-- Search, project, and priority filters for daily board focus.
+- Search, project, member, and priority filters for daily board focus.
 - Clickable project list with a completion pie chart and inline project editor.
 - Task status pie chart showing the current workflow mix.
-- Full monthly meeting calendar with meetings shown on their dates.
-- Login with admin and employee roles, user positions, and optional Discord user IDs.
-- Admins can assign tasks to anyone; employees can create their own tasks and move only their assigned tasks.
+- Compact monthly schedule calendar with meetings and task due dates shown on their dates.
+- Login with admin, client, and employee roles, user positions, project assignment, and optional Discord user IDs.
+- Admins can assign tasks to anyone; project clients can manage tasks and meetings only inside their assigned project; employees can create their own tasks and move only their assigned tasks.
 - Task priority is calculated from the due date automatically.
 - Project completion is calculated from project task status: Todo, Doing, and Done.
 - Task tracking with project assignment, status, due date, assignee, and notes.
 - Meeting calendar management with start/end times, location, attendees, and agenda.
-- Discord webhook alerts when projects, tasks, or meetings are created, when tasks are assigned or moved, and when meetings are updated.
+- Discord webhook alerts through admin, client, and employee channels. Admin gets everything, project/client channels get project updates, and the employee channel gets assignment messages only.
 - Background Discord reminders for meetings starting in 5 minutes and a daily 9:00 greeting with the login link.
 - Manual due-soon alert sender for open tasks and planned meetings inside the configured alert window.
 - SQLite storage with no external database service required.
@@ -36,7 +36,9 @@ Edit `.env` or set environment variables before running the app. Keep real webho
 
 ```powershell
 $env:SECRET_KEY = "replace-this"
-$env:DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
+$env:ADMIN_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
+$env:CLIENT_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
+$env:EMP_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
 $env:ALERT_WINDOW_HOURS = "24"
 $env:APP_PUBLIC_URL = "http://127.0.0.1:5000"
 $env:DEFAULT_ADMIN_USERNAME = "replace this"
@@ -55,9 +57,13 @@ Open [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
 ## Discord Alerts
 
-The app sends Discord messages through `DISCORD_WEBHOOK_URL`.
+The app sends Discord messages through three optional webhook settings:
 
-- Project, task assignment, task movement, and meeting schedule events send alerts immediately when the webhook is configured.
+- `ADMIN_DISCORD_WEBHOOK_URL`: receives every project, task, meeting, due-soon, reminder, and greeting alert.
+- `CLIENT_DISCORD_WEBHOOK_URL`: fallback client/project channel when a project does not have its own webhook.
+- `EMP_DISCORD_WEBHOOK_URL`: receives task assignment/reassignment alerts only, not task movement alerts.
+
+- Project, task assignment, task movement, and meeting schedule events send alerts immediately when the matching webhook is configured.
 - The radio tower button sends alerts for tasks and meetings due within `ALERT_WINDOW_HOURS`.
 - The clock button manually runs scheduled checks.
 - The background scheduler checks every `AUTOMATION_POLL_SECONDS` seconds.

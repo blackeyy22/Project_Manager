@@ -199,7 +199,7 @@ h4 {
   background: rgba(14, 23, 34, 0.88);
 }
 
-.dark-mode body {
+body.dark-mode {
   background: #07101c;
 }
 
@@ -574,6 +574,15 @@ h4 {
   border-left-color: var(--red);
 }
 
+.kanban-card.done-task {
+  border-left-color: var(--green);
+  background: linear-gradient(180deg, rgba(25, 166, 106, 0.12), var(--surface));
+}
+
+.kanban-card.done-task .card-kicker {
+  color: var(--green-2);
+}
+
 .card-kicker {
   justify-content: space-between;
   margin-bottom: 8px;
@@ -790,8 +799,8 @@ h4 {
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(128px, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(7, minmax(104px, 1fr));
+  gap: 6px;
   overflow-x: auto;
 }
 
@@ -804,11 +813,11 @@ h4 {
 }
 
 .calendar-day {
-  min-height: 112px;
+  min-height: 94px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--field);
-  padding: 7px;
+  padding: 6px;
 }
 
 .calendar-day.outside-month {
@@ -845,6 +854,11 @@ h4 {
   border-radius: 8px;
   background: rgba(92, 160, 255, 0.08);
   padding: 6px;
+}
+
+.calendar-event-task {
+  border-color: rgba(25, 166, 106, 0.3);
+  background: rgba(25, 166, 106, 0.08);
 }
 
 .calendar-meeting summary {
@@ -1079,7 +1093,7 @@ textarea:focus {
 
 .segmented-control {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 5px;
   margin-bottom: 10px;
   border: 1px solid var(--line);
@@ -1195,7 +1209,7 @@ textarea:focus {
   }
 
   .calendar-grid {
-    grid-template-columns: repeat(7, minmax(112px, 1fr));
+    grid-template-columns: repeat(7, minmax(96px, 1fr));
   }
 
   .board-toolbar {
