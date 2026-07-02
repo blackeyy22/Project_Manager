@@ -43,7 +43,7 @@ $env:DEFAULT_ADMIN_USERNAME = "replace this"
 $env:DEFAULT_ADMIN_PASSWORD = "replace this"
 ```
 
-On the first run, the app creates a default admin user from `DEFAULT_ADMIN_USERNAME` and `DEFAULT_ADMIN_PASSWORD`. If you do not set them, the login is `Robin@dreamsycn.com` / `Robin@1234`; change it after signing in.
+On the first run, the app creates a default admin user from `DEFAULT_ADMIN_USERNAME` and `DEFAULT_ADMIN_PASSWORD`. Set real credentials in your local `.env`; do not commit real passwords.
 
 ## Run
 

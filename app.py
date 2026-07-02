@@ -35,8 +35,8 @@ TASK_STATUSES = ("Todo", "Doing", "Done")
 TASK_PRIORITIES = ("Low", "Normal", "High", "Critical")
 MEETING_STATUSES = ("Planned", "Held", "Cancelled")
 USER_ROLES = ("admin", "employee")
-DEFAULT_ADMIN_USERNAME = "Robin@dreamsycn.com"
-DEFAULT_ADMIN_PASSWORD = "Robin@1234"
+DEFAULT_ADMIN_USERNAME = "admin@example.com"
+DEFAULT_ADMIN_PASSWORD = "change-this-password"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (

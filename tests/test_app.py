@@ -15,14 +15,14 @@ def make_app(tmp_path, **overrides):
         "DATABASE_PATH": str(tmp_path / "test.sqlite3"),
         "DISCORD_WEBHOOK_URL": "",
         "SECRET_KEY": "test",
-        "DEFAULT_ADMIN_USERNAME": "Robin@dreamsycn.com",
-        "DEFAULT_ADMIN_PASSWORD": "Robin@1234",
+        "DEFAULT_ADMIN_USERNAME": "admin@example.test",
+        "DEFAULT_ADMIN_PASSWORD": "test-admin-password",
     }
     config.update(overrides)
     return create_app(config)
 
 
-def login(client, username="Robin@dreamsycn.com", password="Robin@1234"):
+def login(client, username="admin@example.test", password="test-admin-password"):
     return client.post(
         "/login",
         data={"username": username, "password": password},
