@@ -178,6 +178,109 @@ h4 {
   margin: 12px auto 28px;
 }
 
+.dark-mode {
+  color-scheme: dark;
+  background: #07101c;
+  color: #ecf2f7;
+}
+
+.dark-mode :where(.project-sidebar, .board-workspace, .insight-card, .calendar-panel, .modal) {
+  background: #0d1723;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .app-header,
+.dark-mode .flash,
+.dark-mode .panel-heading,
+.dark-mode .task-stack,
+.dark-mode .project-row,
+.dark-mode .calendar-day,
+.dark-mode .calendar-weekday {
+  background: rgba(14, 23, 34, 0.88);
+}
+
+.dark-mode body {
+  background: #07101c;
+}
+
+.dark-mode .app-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark-mode .status-pill,
+.dark-mode .user-pill,
+.dark-mode .priority,
+.dark-mode .status-token {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dark-mode .filter-control input,
+.dark-mode .filter-control select,
+.dark-mode input,
+.dark-mode textarea,
+.dark-mode select {
+  background: #112236;
+  color: #e5edf5;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dark-mode .flash {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e5edf5;
+}
+
+@media (max-width: 1200px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "projects"
+      "board"
+      "insights"
+      "calendar";
+  }
+
+  .header-actions {
+    justify-content: space-between;
+  }
+
+  .board-toolbar,
+  .project-sidebar,
+  .calendar-panel,
+  .insight-card {
+    padding: 10px;
+  }
+
+  .filter-control {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+  }
+
+  .board-toolbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .kanban-column {
+    min-width: 200px;
+  }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
 .project-sidebar,
 .board-workspace,
 .insight-card,
