@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS projects (
     status TEXT NOT NULL DEFAULT 'Active',
     completion INTEGER NOT NULL DEFAULT 0,
     git_url TEXT,
+    drive_url TEXT,
     description TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -199,6 +200,8 @@ def migrate_db(db: sqlite3.Connection | None = None) -> None:
         db.execute(
             "ALTER TABLE projects ADD COLUMN completion INTEGER NOT NULL DEFAULT 0"
         )
+    if "drive_url" not in project_columns:
+        db.execute("ALTER TABLE projects ADD COLUMN drive_url TEXT")
 
     task_columns = {
         row["name"] for row in db.execute("PRAGMA table_info(tasks)").fetchall()
@@ -282,7 +285,9 @@ def register_routes(app: Flask) -> None:
 
         tasks = db.execute(
             f"""
-            SELECT tasks.*, projects.name AS project_name, projects.git_url AS project_git_url
+            SELECT tasks.*, projects.name AS project_name,
+                projects.git_url AS project_git_url,
+                projects.drive_url AS project_drive_url
                 , users.display_name AS assignee_name, users.username AS assignee_username
                 , users.discord_user_id AS assignee_discord_user_id
             FROM tasks
@@ -300,7 +305,9 @@ def register_routes(app: Flask) -> None:
         ).fetchall()
         meetings = db.execute(
             """
-            SELECT meetings.*, projects.name AS project_name, projects.git_url AS project_git_url
+            SELECT meetings.*, projects.name AS project_name,
+                projects.git_url AS project_git_url,
+                projects.drive_url AS project_drive_url
             FROM meetings
             LEFT JOIN projects ON projects.id = meetings.project_id
             ORDER BY meetings.starts_at ASC
@@ -346,15 +353,17 @@ def register_routes(app: Flask) -> None:
         cursor = db.execute(
             """
             INSERT INTO projects (
-                name, status, completion, git_url, description, created_at, updated_at
+                name, status, completion, git_url, drive_url, description,
+                created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 name,
                 choose("status", PROJECT_STATUSES, "Active"),
                 0,
                 optional_value("git_url"),
+                optional_value("drive_url"),
                 optional_value("description"),
                 now,
                 now,
@@ -371,6 +380,7 @@ def register_routes(app: Flask) -> None:
                 f"Status: {project['status']}",
                 f"Completion: {project['completion']}%",
                 f"Git: {project['git_url'] or 'Not linked'}",
+                f"Drive: {project['drive_url'] or 'Not linked'}",
             ],
         )
         flash("Project saved.", "success")
@@ -387,13 +397,15 @@ def register_routes(app: Flask) -> None:
         db.execute(
             """
             UPDATE projects
-            SET name = ?, status = ?, git_url = ?, description = ?, updated_at = ?
+            SET name = ?, status = ?, git_url = ?, drive_url = ?,
+                description = ?, updated_at = ?
             WHERE id = ?
             """,
             (
                 name,
                 choose("status", PROJECT_STATUSES, "Active"),
                 optional_value("git_url"),
+                optional_value("drive_url"),
                 optional_value("description"),
                 current_timestamp(),
                 project_id,
@@ -666,7 +678,7 @@ def register_routes(app: Flask) -> None:
     @admin_required
     def test_alert():
         sent, message = send_discord_alert(
-            "Project manager test",
+            "DreamBroad test",
             ["Discord alerts are connected."],
         )
         flash(message, "success" if sent else "warning")
@@ -684,7 +696,9 @@ def register_routes(app: Flask) -> None:
 
         tasks = db.execute(
             """
-            SELECT tasks.*, projects.name AS project_name, projects.git_url AS project_git_url
+            SELECT tasks.*, projects.name AS project_name,
+                projects.git_url AS project_git_url,
+                projects.drive_url AS project_drive_url
             FROM tasks
             LEFT JOIN projects ON projects.id = tasks.project_id
             WHERE tasks.status != 'Done'
@@ -697,7 +711,9 @@ def register_routes(app: Flask) -> None:
         ).fetchall()
         meetings = db.execute(
             """
-            SELECT meetings.*, projects.name AS project_name, projects.git_url AS project_git_url
+            SELECT meetings.*, projects.name AS project_name,
+                projects.git_url AS project_git_url,
+                projects.drive_url AS project_drive_url
             FROM meetings
             LEFT JOIN projects ON projects.id = meetings.project_id
             WHERE meetings.status = 'Planned'
@@ -1020,7 +1036,9 @@ def resolve_task_assignee(db: sqlite3.Connection) -> sqlite3.Row | None:
 def load_task_detail(db: sqlite3.Connection, task_id: int) -> sqlite3.Row | None:
     return db.execute(
         """
-        SELECT tasks.*, projects.name AS project_name, projects.git_url AS project_git_url,
+        SELECT tasks.*, projects.name AS project_name,
+            projects.git_url AS project_git_url,
+            projects.drive_url AS project_drive_url,
             users.display_name AS assignee_name, users.username AS assignee_username,
             users.discord_user_id AS assignee_discord_user_id
         FROM tasks
@@ -1035,7 +1053,9 @@ def load_task_detail(db: sqlite3.Connection, task_id: int) -> sqlite3.Row | None
 def load_meeting_detail(db: sqlite3.Connection, meeting_id: int) -> sqlite3.Row | None:
     return db.execute(
         """
-        SELECT meetings.*, projects.name AS project_name, projects.git_url AS project_git_url
+        SELECT meetings.*, projects.name AS project_name,
+            projects.git_url AS project_git_url,
+            projects.drive_url AS project_drive_url
         FROM meetings
         LEFT JOIN projects ON projects.id = meetings.project_id
         WHERE meetings.id = ?
@@ -1139,7 +1159,9 @@ def send_meeting_reminders(db: sqlite3.Connection, now: datetime) -> int:
     starts_after = now.strftime(DATETIME_FORMAT)
     meetings = db.execute(
         """
-        SELECT meetings.*, projects.name AS project_name, projects.git_url AS project_git_url
+        SELECT meetings.*, projects.name AS project_name,
+            projects.git_url AS project_git_url,
+            projects.drive_url AS project_drive_url
         FROM meetings
         LEFT JOIN projects ON projects.id = meetings.project_id
         WHERE meetings.status = 'Planned'
@@ -1281,6 +1303,7 @@ def load_calendar_month(meetings: list[sqlite3.Row]) -> dict:
                 "project_id": meeting["project_id"],
                 "project_name": meeting["project_name"] or "Unassigned",
                 "project_git_url": meeting["project_git_url"] or "",
+                "project_drive_url": meeting["project_drive_url"] or "",
                 "title": meeting["title"],
                 "status": meeting["status"],
                 "starts_at": meeting["starts_at"],
@@ -1355,6 +1378,7 @@ def load_project_summaries(
                 "done_tasks": done_tasks,
                 "open_tasks": task_counts["open_tasks"] or 0,
                 "git_url": project["git_url"] or "",
+                "drive_url": project["drive_url"] or "",
                 "description": project["description"] or "",
                 "next_meeting": next_meeting["starts_at"] if next_meeting else "",
             }
@@ -1367,15 +1391,25 @@ def build_due_alert_lines(tasks: list[sqlite3.Row], meetings: list[sqlite3.Row])
     for task in tasks:
         project = task["project_name"] or "Unassigned"
         git = f" | {task['project_git_url']}" if task["project_git_url"] else ""
+        drive = (
+            f" | Drive: {task['project_drive_url']}"
+            if task["project_drive_url"]
+            else ""
+        )
         lines.append(
-            f"Task: {task['title']} | {project} | {task['priority']} | due {task['due_at']}{git}"
+            f"Task: {task['title']} | {project} | {task['priority']} | due {task['due_at']}{git}{drive}"
         )
 
     for meeting in meetings:
         project = meeting["project_name"] or "Unassigned"
         git = f" | {meeting['project_git_url']}" if meeting["project_git_url"] else ""
+        drive = (
+            f" | Drive: {meeting['project_drive_url']}"
+            if meeting["project_drive_url"]
+            else ""
+        )
         lines.append(
-            f"Meeting: {meeting['title']} | {project} | starts {meeting['starts_at']}{git}"
+            f"Meeting: {meeting['title']} | {project} | starts {meeting['starts_at']}{git}{drive}"
         )
 
     return lines
@@ -1393,7 +1427,7 @@ def send_discord_alert(title: str, lines: list[str]) -> tuple[bool, str]:
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "User-Agent": "project-manager-flask/1.0",
+            "User-Agent": "dreambroad-flask/1.0",
         },
         method="POST",
     )

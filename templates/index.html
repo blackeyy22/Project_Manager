@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DREAMBROAD</title>
+  <title>DreamBroad</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 </head>
@@ -11,7 +11,7 @@
   <header class="app-header">
     <div>
       <p class="eyebrow">Operations Workspace</p>
-      <h1>DREAMBROAD</h1>
+      <h1>DreamBroad</h1>
     </div>
     <div class="header-actions">
       <span class="user-pill">
@@ -255,7 +255,7 @@
                     data-search="{{ task.title }} {{ task.project_name or '' }} {{ task.assignee_name or task.assignee or '' }} {{ task.notes or '' }}"
                   >
                     <div class="card-kicker">
-                      <span>PM-{{ task.id }}</span>
+                      <span>DB-{{ task.id }}</span>
                       <span class="priority {{ task.priority|lower }}">{{ task.priority }}</span>
                     </div>
                     <h4>{{ task.title }}</h4>
@@ -270,6 +270,11 @@
                       {% if task.project_git_url %}
                         <a href="{{ task.project_git_url }}" target="_blank" rel="noreferrer">
                           <i data-lucide="git-branch"></i>Git
+                        </a>
+                      {% endif %}
+                      {% if task.project_drive_url %}
+                        <a href="{{ task.project_drive_url }}" target="_blank" rel="noreferrer">
+                          <i data-lucide="folder-symlink"></i>Drive
                         </a>
                       {% endif %}
                     </div>
@@ -437,6 +442,11 @@
                         <i data-lucide="external-link"></i>Git
                       </a>
                     {% endif %}
+                    {% if meeting.project_drive_url %}
+                      <a class="text-link" href="{{ meeting.project_drive_url }}" target="_blank" rel="noreferrer">
+                        <i data-lucide="folder-symlink"></i>Drive
+                      </a>
+                    {% endif %}
                     {% if is_admin %}
                       <form class="compact-form calendar-edit-form" method="post" action="{{ url_for('update_meeting', meeting_id=meeting.id) }}">
                         <label class="full">
@@ -540,6 +550,10 @@
       <label class="full">
         <span>Git URL</span>
         <input name="git_url" type="url" placeholder="https://github.com/org/repo">
+      </label>
+      <label class="full">
+        <span>Drive URL</span>
+        <input name="drive_url" type="url" placeholder="https://drive.google.com/drive/folders/...">
       </label>
       <label class="full">
         <span>Description</span>
@@ -677,9 +691,16 @@
       const status = escapeHTML(project.status);
       const description = escapeHTML(project.description);
       const gitUrl = escapeHTML(project.git_url);
+      const driveUrl = escapeHTML(project.drive_url);
       const gitLink = project.git_url
         ? `<a class="text-link" href="${gitUrl}" target="_blank" rel="noreferrer"><i data-lucide="external-link"></i>Git Repository</a>`
-        : `<span class="muted-text">No Git link yet</span>`;
+        : "";
+      const driveLink = project.drive_url
+        ? `<a class="text-link" href="${driveUrl}" target="_blank" rel="noreferrer"><i data-lucide="folder-symlink"></i>Drive Folder</a>`
+        : "";
+      const projectLinks = gitLink || driveLink
+        ? `${gitLink}${driveLink}`
+        : `<span class="muted-text">No project links yet</span>`;
       const editor = canManageProjects ? `
         <details class="project-editor">
           <summary><i data-lucide="square-pen"></i>Edit Project</summary>
@@ -697,6 +718,10 @@
             <label class="full">
               <span>Git URL</span>
               <input name="git_url" type="url" value="${gitUrl}">
+            </label>
+            <label class="full">
+              <span>Drive URL</span>
+              <input name="drive_url" type="url" value="${driveUrl}">
             </label>
             <label class="full">
               <span>Description</span>
@@ -726,7 +751,7 @@
           <span><strong>${project.open_tasks}</strong> open</span>
           <span><strong>${project.task_completion}%</strong> task done</span>
         </div>
-        <div class="detail-link-row">${gitLink}</div>
+        <div class="detail-link-row">${projectLinks}</div>
         ${editor}
       `;
     }

@@ -1,11 +1,11 @@
-# Project Manager
+# DreamBroad
 
-A white, blue, and green Python Flask web app for managing projects, tasks, meeting calendars, Git repository links, and Discord alerts.
+A white, blue, and green Python Flask web app for managing projects, tasks, meeting calendars, Git/Drive links, and Discord alerts.
 
 ## Features
 
 - Single Add button for creating projects, tasks, or meetings from one dialog.
-- Project tracking with status, completion percentage, description, and optional Git URL.
+- Project tracking with status, completion percentage, description, and optional Git/Drive URLs.
 - Professional kanban board with Todo, Doing, and Done lanes.
 - Drag and drop cards between lanes, with the status saved immediately.
 - Search, project, and priority filters for daily board focus.
@@ -71,9 +71,9 @@ The due alert endpoint can also be called by a scheduled job:
 Invoke-WebRequest -Method Post -Uri http://127.0.0.1:5000/alerts/due
 ```
 
-## Git Links
+## Project Links
 
-Each project has a Git URL field. Add a GitHub, GitLab, Bitbucket, or private repository URL there and the dashboard will expose a Git link for the project, its tasks, and its meetings.
+Each project has Git URL and Drive URL fields. Add a GitHub, GitLab, Bitbucket, private repository, or Google Drive folder URL there and the dashboard will expose those links for the project, its tasks, and its meetings.
 
 This project is intended to be pushed to [blackeyy22/Project_Manager](https://github.com/blackeyy22/Project_Manager).
 

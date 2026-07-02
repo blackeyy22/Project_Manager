@@ -54,6 +54,7 @@ def test_dashboard_requires_login_and_admin_can_enter(tmp_path):
 
     response = login(client)
     assert response.status_code == 200
+    assert b"DreamBroad" in response.data
     assert b"Operations Workspace" in response.data
     assert b"Add Item" in response.data
     assert b"Users" in response.data
@@ -80,6 +81,7 @@ def test_create_project_task_and_meeting_with_automatic_fields(tmp_path):
             "status": "Active",
             "completion": "35",
             "git_url": "https://github.com/example/website",
+            "drive_url": "https://drive.google.com/drive/folders/example",
             "description": "Client work",
         },
     )
@@ -136,6 +138,10 @@ def test_create_project_task_and_meeting_with_automatic_fields(tmp_path):
         assert db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 3
         assert db.execute("SELECT COUNT(*) FROM meetings").fetchone()[0] == 1
         assert db.execute("SELECT completion FROM projects").fetchone()[0] == 50
+        assert (
+            db.execute("SELECT drive_url FROM projects").fetchone()[0]
+            == "https://drive.google.com/drive/folders/example"
+        )
         priorities = [
             row[0]
             for row in db.execute("SELECT priority FROM tasks ORDER BY id").fetchall()
@@ -149,6 +155,7 @@ def test_create_project_task_and_meeting_with_automatic_fields(tmp_path):
     assert b"Build prototype" in dashboard.data
     assert b"QA handoff" in dashboard.data
     assert b"Kickoff" in dashboard.data
+    assert b"https://drive.google.com/drive/folders/example" in dashboard.data
 
 
 def test_task_status_json_endpoint_moves_card_and_updates_completion(tmp_path):
