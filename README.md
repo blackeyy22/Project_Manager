@@ -18,7 +18,7 @@ A white, blue, and green Python Flask web app for managing projects, tasks, meet
 - Project completion is calculated from project task status: Todo, Doing, and Done.
 - Task tracking with project assignment, status, due date, assignee, and notes.
 - Meeting calendar management with start/end times, location, attendees, and agenda.
-- Discord webhook alerts through admin, client, and employee channels. Admin gets everything, project/client channels get project updates, and the employee channel gets assignment messages only.
+- Discord webhook alerts through admin, per-project, and employee channels. Admin gets everything, each project webhook gets only that project's updates, and the employee channel gets assignment messages only.
 - Background Discord reminders for meetings starting in 5 minutes and a daily 9:00 greeting with the login link.
 - Manual due-soon alert sender for open tasks and planned meetings inside the configured alert window.
 - SQLite storage with no external database service required.
@@ -32,12 +32,11 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Edit `.env` or set environment variables before running the app. Keep real webhooks in `.env`; it is ignored by Git.
+Edit `.env` or set environment variables before running the app. Keep the admin and employee webhooks in `.env`; project/client webhooks are saved on each project from the app.
 
 ```powershell
 $env:SECRET_KEY = "replace-this"
 $env:ADMIN_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
-$env:CLIENT_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
 $env:EMP_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
 $env:ALERT_WINDOW_HOURS = "24"
 $env:APP_PUBLIC_URL = "http://127.0.0.1:5000"
@@ -57,11 +56,11 @@ Open [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
 ## Discord Alerts
 
-The app sends Discord messages through three optional webhook settings:
+The app sends Discord messages through admin and employee `.env` webhooks plus the webhook saved on each project:
 
 - `ADMIN_DISCORD_WEBHOOK_URL`: receives every project, task, meeting, due-soon, reminder, and greeting alert.
-- `CLIENT_DISCORD_WEBHOOK_URL`: fallback client/project channel when a project does not have its own webhook.
 - `EMP_DISCORD_WEBHOOK_URL`: receives task assignment/reassignment alerts only, not task movement alerts.
+- Project webhook URL: entered while creating/editing a project; receives only that project's project/task/meeting updates.
 
 - Project, task assignment, task movement, and meeting schedule events send alerts immediately when the matching webhook is configured.
 - The radio tower button sends alerts for tasks and meetings due within `ALERT_WINDOW_HOURS`.
@@ -79,7 +78,7 @@ Invoke-WebRequest -Method Post -Uri http://127.0.0.1:5000/alerts/due
 
 ## Project Links
 
-Each project has Git URL and Drive URL fields. Add a GitHub, GitLab, Bitbucket, private repository, or Google Drive folder URL there and the dashboard will expose those links for the project, its tasks, and its meetings.
+Each project has Git URL, Drive URL, and Project webhook URL fields. Add a GitHub, GitLab, Bitbucket, private repository, or Google Drive folder URL there and the dashboard will expose those links for the project, its tasks, and its meetings. Add the project's Discord webhook there so only that project's client channel receives that project's updates.
 
 This project is intended to be pushed to [blackeyy22/Project_Manager](https://github.com/blackeyy22/Project_Manager).
 

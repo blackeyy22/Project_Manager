@@ -15,7 +15,6 @@ def make_app(tmp_path, **overrides):
         "DATABASE_PATH": str(tmp_path / "test.sqlite3"),
         "DISCORD_WEBHOOK_URL": "",
         "ADMIN_DISCORD_WEBHOOK_URL": "",
-        "CLIENT_DISCORD_WEBHOOK_URL": "",
         "EMP_DISCORD_WEBHOOK_URL": "",
         "SECRET_KEY": "test",
         "DEFAULT_ADMIN_USERNAME": "admin@example.test",
@@ -482,7 +481,6 @@ def test_discord_webhooks_route_by_event_type(tmp_path, monkeypatch):
     app = make_app(
         tmp_path,
         ADMIN_DISCORD_WEBHOOK_URL="admin-hook",
-        CLIENT_DISCORD_WEBHOOK_URL="global-client-hook",
         EMP_DISCORD_WEBHOOK_URL="employee-hook",
     )
     client = app.test_client()
@@ -523,6 +521,26 @@ def test_discord_webhooks_route_by_event_type(tmp_path, monkeypatch):
     }
 
     sent_messages.clear()
+    client.post(
+        "/tasks/1",
+        data={
+            "project_id": "1",
+            "title": "Notify me edited",
+            "status": "Todo",
+            "assignee_user_id": "2",
+            "due_at": "",
+            "notes": "Updated notes",
+        },
+    )
+    update_urls = {
+        webhook_url
+        for title, _lines, webhook_url in sent_messages
+        if title == "Task updated"
+    }
+    assert update_urls == {"admin-hook", "project-client-hook"}
+    assert "employee-hook" not in update_urls
+
+    sent_messages.clear()
     response = client.post(
         "/tasks/1/status",
         json={"status": "Doing"},
@@ -535,6 +553,56 @@ def test_discord_webhooks_route_by_event_type(tmp_path, monkeypatch):
         if title == "Task moved"
     }
     assert move_urls == {"admin-hook", "project-client-hook"}
+    assert "employee-hook" not in move_urls
+
+    sent_messages.clear()
+    client.post(
+        "/projects/1",
+        data={
+            "name": "Webhook project edited",
+            "status": "Active",
+            "git_url": "",
+            "drive_url": "",
+            "client_webhook_url": "project-client-hook",
+            "description": "",
+        },
+    )
+    project_update_urls = {
+        webhook_url
+        for title, _lines, webhook_url in sent_messages
+        if title == "Project updated"
+    }
+    assert project_update_urls == {"admin-hook", "project-client-hook"}
+
+    starts_at = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
+    sent_messages.clear()
+    client.post(
+        "/meetings",
+        data={"project_id": "1", "title": "Webhook sync", "starts_at": starts_at},
+    )
+    meeting_create_urls = {
+        webhook_url
+        for title, _lines, webhook_url in sent_messages
+        if title == "Meeting scheduled"
+    }
+    assert meeting_create_urls == {"admin-hook", "project-client-hook"}
+
+    sent_messages.clear()
+    client.post(
+        "/meetings/1",
+        data={
+            "project_id": "1",
+            "title": "Webhook sync edited",
+            "status": "Planned",
+            "starts_at": starts_at,
+        },
+    )
+    meeting_update_urls = {
+        webhook_url
+        for title, _lines, webhook_url in sent_messages
+        if title == "Meeting updated"
+    }
+    assert meeting_update_urls == {"admin-hook", "project-client-hook"}
 
 
 def test_scheduled_discord_jobs_send_meeting_reminder_and_daily_greeting(
