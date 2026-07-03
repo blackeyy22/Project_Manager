@@ -236,14 +236,16 @@
               {% endfor %}
             </select>
           </label>
-          <label class="filter-control">
-            <select data-filter-member>
-              <option value="">All members</option>
-              {% for user in users %}
-                <option value="{{ user.display_name }}">{{ user.display_name }}</option>
-              {% endfor %}
-            </select>
-          </label>
+          {% if is_admin or is_client %}
+            <label class="filter-control">
+              <select data-filter-member>
+                <option value="">All members</option>
+                {% for user in users %}
+                  <option value="{{ user.display_name }}">{{ user.display_name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          {% endif %}
           <label class="filter-control">
             <select data-filter-priority>
               <option value="">All priorities</option>
@@ -464,7 +466,7 @@
                 {% for event in day.events %}
                   <details class="calendar-meeting calendar-event calendar-event-{{ event.type }}"
                     data-project-id="{{ event.project_id or '' }}"
-                    data-assignee="{{ event.assignee_name or '' }}"
+                    data-assignee="{{ event.assignee_name or event.attendees or '' }}"
                     data-priority="{{ event.priority or '' }}"
                     data-search="{{ (event.title ~ ' ' ~ event.project_name)|e }}">
                     <summary>
@@ -770,11 +772,20 @@
       const project = document.querySelector("[data-filter-project]")?.value || "";
       const member = document.querySelector("[data-filter-member]")?.value || "";
       const priority = document.querySelector("[data-filter-priority]")?.value || "";
+      const memberMatches = (value) => {
+        if (!member) {
+          return true;
+        }
+        return String(value || "")
+          .split(",")
+          .map((item) => item.trim())
+          .includes(member);
+      };
 
       document.querySelectorAll("[data-task-card]").forEach((card) => {
         const matchesText = !query || card.dataset.search.toLowerCase().includes(query);
         const matchesProject = !project || card.dataset.projectId === project;
-        const matchesMember = !member || card.dataset.assignee === member;
+        const matchesMember = memberMatches(card.dataset.assignee);
         const matchesPriority = !priority || card.dataset.priority === priority;
         card.hidden = !(matchesText && matchesProject && matchesMember && matchesPriority);
       });
@@ -782,7 +793,7 @@
       document.querySelectorAll(".calendar-event").forEach((event) => {
         const matchesText = !query || event.dataset.search.toLowerCase().includes(query);
         const matchesProject = !project || event.dataset.projectId === project;
-        const matchesMember = !member || event.dataset.assignee === member;
+        const matchesMember = memberMatches(event.dataset.assignee);
         const matchesPriority = !priority || event.dataset.priority === priority;
         event.hidden = !(matchesText && matchesProject && matchesMember && matchesPriority);
       });
@@ -846,12 +857,20 @@
 
       const darkModeToggle = document.getElementById("dark-mode-toggle");
       const currentTheme = localStorage.getItem("theme") || "light";
-      if (currentTheme === "dark") {
-        document.body.classList.add("dark-mode");
+      function setTheme(theme) {
+        const isDark = theme === "dark";
+        document.body.classList.toggle("dark-mode", isDark);
+        localStorage.setItem("theme", isDark ? "dark" : "light");
+        if (darkModeToggle) {
+          darkModeToggle.innerHTML = `<i data-lucide="${isDark ? "sun" : "moon"}"></i>`;
+          darkModeToggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+          darkModeToggle.setAttribute("title", isDark ? "Switch to light mode" : "Switch to dark mode");
+          refreshIcons();
+        }
       }
+      setTheme(currentTheme);
       darkModeToggle?.addEventListener("click", () => {
-        document.body.classList.toggle("dark-mode");
-        localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
+        setTheme(document.body.classList.contains("dark-mode") ? "light" : "dark");
       });
 
       const projects = JSON.parse(document.getElementById("project-data").textContent || "[]");
@@ -881,7 +900,7 @@
       applyFilters();
       updateColumnCounts();
       let formDirty = false;
-      document.querySelectorAll("input, select, textarea").forEach((field) => {
+      document.querySelectorAll("form input, form select, form textarea").forEach((field) => {
         field.addEventListener("input", () => {
           formDirty = true;
         });

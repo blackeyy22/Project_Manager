@@ -377,10 +377,12 @@ def register_routes(app: Flask) -> None:
                 """,
                 (g.current_user["project_id"], g.current_user["id"], g.current_user["project_id"]),
             ).fetchall()
-        else:
+        elif is_admin():
             users = db.execute(
                 "SELECT * FROM users WHERE active = 1 ORDER BY role, display_name"
             ).fetchall()
+        else:
+            users = [g.current_user]
 
         return render_template(
             "index.html",

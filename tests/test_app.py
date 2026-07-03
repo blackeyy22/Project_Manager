@@ -290,6 +290,9 @@ def test_employee_can_create_self_task_and_only_move_own_tasks(tmp_path):
 
     client.post("/logout")
     login(client, "dev", "dev123")
+    dashboard = client.get("/")
+    assert b"All members" not in dashboard.data
+
     client.post(
         "/tasks",
         data={
@@ -378,6 +381,7 @@ def test_client_manages_only_their_project_work(tmp_path):
     assert b"Hidden task" not in dashboard.data
     assert b"Project Dev" in dashboard.data
     assert b"Outside Dev" not in dashboard.data
+    assert b"All members" in dashboard.data
     assert b"data-form-tab=\"meeting\"" in dashboard.data
     assert b"data-form-tab=\"project\"" not in dashboard.data
 
