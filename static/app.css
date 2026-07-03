@@ -826,6 +826,11 @@ body.dark-mode {
   font-size: 0.72rem;
 }
 
+.meeting-editor {
+  border-top: 1px solid var(--line);
+  padding-top: 7px;
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(104px, 1fr));
@@ -890,7 +895,7 @@ body.dark-mode {
   background: rgba(25, 166, 106, 0.08);
 }
 
-.calendar-meeting summary {
+.calendar-meeting > summary {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -899,13 +904,13 @@ body.dark-mode {
   color: var(--ink);
 }
 
-.calendar-meeting summary span {
+.calendar-meeting > summary span {
   color: var(--green);
   font-size: 0.68rem;
   font-weight: 900;
 }
 
-.calendar-meeting summary strong {
+.calendar-meeting > summary strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -922,6 +927,10 @@ body.dark-mode {
 }
 
 .calendar-edit-form {
+  grid-template-columns: 1fr;
+}
+
+.meeting-edit-form {
   grid-template-columns: 1fr;
 }
 
@@ -1072,6 +1081,54 @@ label span {
   font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
+}
+
+.checkbox-group {
+  display: grid;
+  gap: 7px;
+}
+
+.field-label {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 6px;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 7px 9px;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.checkbox-option input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  accent-color: var(--green);
+}
+
+.checkbox-option span {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 input:focus,

@@ -147,6 +147,8 @@ def test_create_project_task_and_meeting_with_automatic_fields(tmp_path):
             "status": "Planned",
             "starts_at": meeting_start,
             "ends_at": meeting_end,
+            "attendees": ["Admin", "Dev User"],
+            "agenda": "Kickoff agenda",
         },
     )
 
@@ -160,6 +162,10 @@ def test_create_project_task_and_meeting_with_automatic_fields(tmp_path):
             db.execute("SELECT drive_url FROM projects").fetchone()[0]
             == "https://drive.google.com/drive/folders/example"
         )
+        assert (
+            db.execute("SELECT attendees FROM meetings WHERE id = 1").fetchone()[0]
+            == "Admin, Dev User"
+        )
         priorities = [
             row[0]
             for row in db.execute("SELECT priority FROM tasks ORDER BY id").fetchall()
@@ -168,11 +174,36 @@ def test_create_project_task_and_meeting_with_automatic_fields(tmp_path):
     finally:
         db.close()
 
+    client.post(
+        "/meetings/1",
+        data={
+            "project_id": "1",
+            "title": "Updated Kickoff",
+            "status": "Planned",
+            "starts_at": meeting_start,
+            "ends_at": meeting_end,
+            "location": "Zoom",
+            "attendees": ["Dev User"],
+            "agenda": "Updated agenda",
+        },
+    )
+    db = sqlite3.connect(db_path)
+    try:
+        meeting = db.execute(
+            "SELECT title, attendees, location, agenda FROM meetings WHERE id = 1"
+        ).fetchone()
+        assert meeting == ("Updated Kickoff", "Dev User", "Zoom", "Updated agenda")
+    finally:
+        db.close()
+
     dashboard = client.get("/")
     assert b"Task Status" in dashboard.data
     assert b"Build prototype" in dashboard.data
     assert b"QA handoff" in dashboard.data
-    assert b"Kickoff" in dashboard.data
+    assert b"Updated Kickoff" in dashboard.data
+    assert b"Edit Meeting" in dashboard.data
+    assert b"Delete Meeting" in dashboard.data
+    assert b'type="checkbox" name="attendees"' in dashboard.data
     assert b"https://drive.google.com/drive/folders/example" in dashboard.data
 
 
